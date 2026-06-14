@@ -89,7 +89,7 @@ class DataGen(keras.utils.Sequence):
                  #True for outputing labels for clf
                  for_clf = False):
 
-        self.new_path_origin = os.path.join(os.environ['DATA_PATH'], 'temp')
+        self.new_path_origin = os.path.join(os.environ['DATA_PATH'], 'temp2')
         if delete_cahce:
             if os.path.exists(self.new_path_origin):
                 shutil.rmtree(self.new_path_origin)

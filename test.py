@@ -8,21 +8,22 @@ from cell_imaging_utils.image.image_utils import ImageUtils
 import global_vars as gv
 import os
 from utils import get_weights
+import init_env_vars
 
 #Methods to predict and compare to GT
 gv.model_type = "MG" #"UNET" #"VAE" #"AAE" #"AE" #"CLF" #"RC" #"PM" #"MG"
 for_clf = (gv.model_type == "CLF")
 
 predictors=None #True w_dna
-gv.model_path = "../mg_model_mito_13_05_24_noise_1.5_sim_1.0_target_2.0_mask_1.0_mse"
+gv.model_path = "../mg_model_bundles_13_05_24_1.0"
 
 #Input and target channels in the image
 gv.input = "channel_signal"
 gv.target = "channel_target"
 
 #Organelle to predict the model upon
-gv.organelle = "Mitochondria" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
-#"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
+gv.organelle = "Acto" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+#"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #Actomyosin-bundles
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
 gv.test_ds_path = os.path.join(os.environ['DATA_PATH'], "{}/image_list_test.csv".format(gv.organelle))
@@ -143,4 +144,4 @@ if (gv.model_type == "UNET"):
 
 elif (gv.model_type == "MG"):
     from mg_analyzer import analyze_th
-    analyze_th(test_dataset,"agg",mask_image=None,manual_th="full",save_image=4,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,)
+    analyze_th(test_dataset,"agg",mask_image=None,manual_th="full",save_image=4,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,noise_scale = 1.0)

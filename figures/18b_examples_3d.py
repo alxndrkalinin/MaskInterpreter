@@ -9,7 +9,7 @@ from figure_config import figure_config,scalebar
 
 
 params = [
-          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slices":[7,19,30,42]},
+        #   {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slices":[7,19,30,42]},
           {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","th":0.40,"slices":[7,19,32,44]},
           {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","th":0.40,"slices":[7,22,34,48]},
           {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","th":0.30,"slices":[18,30,44,51]},

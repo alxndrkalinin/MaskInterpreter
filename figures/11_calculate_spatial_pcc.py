@@ -1,13 +1,20 @@
+import sys
+import os
+
+# Add parent directory to path to import cell_generator modules
+# sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import init_env_vars
 import tensorflow as tf
 import tensorflow.keras as keras
 from metrics import *
 from cell_imaging_utils.image.image_utils import ImageUtils
 import global_vars as gv
 from utils import *
-import os
 import cv2
 from dataset import DataGen
-import init_env_vars
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 
 params = [
@@ -17,14 +24,14 @@ params = [
         #   {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","noise":1.5},
         #   {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","noise":1.0},
         #   {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","noise":1.5},
-        #   {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise":1.0},
-        #   {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","noise":1.5},
+          {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","noise":1.0},
+          {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","noise":1.5},
         #   {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","noise":1.5},
-        {"organelle":"DNA","model":"../mg_model_dna_13_05_24_1.5b","noise":1.5},
+        # {"organelle":"DNA","model":"../mg_model_dna_13_05_24_1.5b","noise":1.5},
           ]
 
 gv.input = "channel_signal"
-gv.target = "channel_dna"
+gv.target = "channel_target"
 weighted_pcc = False
 
 
@@ -36,21 +43,28 @@ for gpu in gpus:
 
 
 ## Patch steps
-xy_step = 32
+xy_step = 64
 z_step = 16
 
 batch_size = 4
+def auto_balance(image):
+    """Auto balance the image similar to ImageJ's Auto Contrast function."""
+    image = image.astype(np.float32)
+    plow, phigh = np.percentile(image, (0.1, 99.9))
+    image = np.clip((image - plow) / (phigh - plow), 0, 1)
+    return image
 
 def calculate_spatial_pcc(image1,image2):
     # Compute the Pearson correlation coefficient matrix for each slice of the 3D images
     corr_matrix = np.zeros((image1.shape[0], image1.shape[1], image1.shape[2]))
     occur_matrix = np.zeros((image1.shape[0], image1.shape[1], image1.shape[2]))
-    for z in range(image1.shape[0]):
-        for i in range(0,image1.shape[1] - xy_step + 1,z_step):
-            for j in range(0,image1.shape[2] - xy_step + 1,z_step):
-                corr_matrix[z,i:i+xy_step, j:j+xy_step] += np.corrcoef(image1[z,i:i+xy_step, j:j+xy_step].flatten(), image2[z,i:i+xy_step, j:j+xy_step].flatten())[0, 1]
-                occur_matrix[z,i:i+xy_step, j:j+xy_step] +=1.0
-    return (corr_matrix/occur_matrix).astype(np.float16)           
+    for z in range(0,image1.shape[0]- z_step,z_step):
+        for i in range(0,image1.shape[1]- xy_step,xy_step):
+            for j in range(0,image1.shape[2] - xy_step,xy_step):
+                # corr_matrix[z:z+z_step,i:i+xy_step, j:j+xy_step] += np.corrcoef(image1[z:z+z_step,i:i+xy_step, j:j+xy_step].flatten(), image2[z:z+z_step,i:i+xy_step, j:j+xy_step].flatten())[0, 1]
+                corr_matrix[z:z+z_step,i:i+xy_step, j:j+xy_step] +=tf_pearson_corr(image1[z:z+z_step,i:i+xy_step, j:j+xy_step], image2[z:z+z_step,i:i+xy_step, j:j+xy_step])[0, 1]
+                occur_matrix[z:z+z_step,i:i+xy_step, j:j+xy_step] +=1.0
+    return (corr_matrix).astype(np.float16), occur_matrix.astype(np.float16)           
 
 def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,model=None,images=range(10),weighted_pcc=False,noise_scale=1.5):
     """This method run analysis that find the std of the noise that need to be used for the input data
@@ -140,21 +154,80 @@ def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,mo
         del mask_patchs_p_term
         del mask_noise_patchs
         
-        prediction_to_gt_spatial_pcc = calculate_spatial_pcc(target_image,unet_p/d)
+        prediction_to_gt_spatial_pcc, occur_matrix = calculate_spatial_pcc(target_image,unet_p/d)
+        prediction_to_gt_spatial_pcc = np.expand_dims(prediction_to_gt_spatial_pcc/d, axis=-1)
         ImageUtils.imsave(prediction_to_gt_spatial_pcc,"{}/prediction_to_gt_spatial_pcc_{}.tiff".format(dir_path,image_index))
         
-        prediction_to_noisy_spatial_pcc = calculate_spatial_pcc(unet_noise_p/d,unet_p/d)
-        ImageUtils.imsave(prediction_to_noisy_spatial_pcc,"{}/prediction_to_noisy_spatial_pcc_{}.tiff".format(dir_path,image_index))
+        # Create overlay image: prediction with spatial PCC heatmap
+        th=0.0
+        prediction_normalized = unet_p/d
+        pcc_for_overlay = prediction_to_gt_spatial_pcc[:,:,:,0]
+        # pcc_normalized = np.where(1-np.abs(pcc_for_overlay)<th,1-np.abs(pcc_for_overlay),0.0)#
+        # pcc_normalized = 1 - np.clip(pcc_for_overlay, 0, 1)  # move range [-1,1] to [0,1]
+        pcc_normalized = pcc_for_overlay
         
-        spatial_pcc_for_prediction = calculate_spatial_pcc(prediction_to_gt_spatial_pcc,prediction_to_noisy_spatial_pcc)
-        ImageUtils.imsave(spatial_pcc_for_prediction[18],"{}/prediction_to_gt_to_prediction_to_noisy_spatial_pcc{}.tiff".format(dir_path,image_index))
+        # Create overlay for each z-slice
+        overlay_volume = []
+        for z in range(prediction_normalized.shape[0]):
+            pred_slice = auto_balance(prediction_normalized[z, :, :, 0].astype(np.float32))
+            pcc_slice = pcc_normalized[z, :, :].astype(np.float32)
+            
+            # Convert prediction to RGB (grayscale in all channels)
+            pred_rgb = np.stack([pred_slice, pred_slice, pred_slice], axis=-1)
+            
+            # Apply red colormap to PCC values (higher correlation = brighter red)
+            pcc_colored = np.stack([pcc_slice, np.zeros_like(pcc_slice), np.zeros_like(pcc_slice)], axis=-1)
+            
+            # Blend prediction and PCC heatmap (25% prediction, 75% heatmap)
+            overlay_slice = 0.7 * pred_rgb + 0.3 * pcc_colored
+            
+            overlay_volume.append(overlay_slice)
         
-        pcc = pearson_corr((unet_p/d)[:,:,:], (unet_noise_p/d)[:,:,:],target_seg_image_dilated)
-        pcc_gt = pearson_corr((unet_p/d)[:,:,:], (target_image)[:,:,:],target_seg_image_dilated)
-        score_for_mask_efficacy_in_pcc = pearson_corr(prediction_to_gt_spatial_pcc,prediction_to_noisy_spatial_pcc)
-        print("pearson corr for with noisy image:{} is :{}".format(image_index,pcc))
-        print("pearson corr for gt image:{} is :{}".format(image_index,pcc_gt))
-        print("pearson corr for both spatial pccs image:{} is :{}".format(image_index,score_for_mask_efficacy_in_pcc))
+        overlay_volume = np.stack(overlay_volume, axis=0).astype(np.float32)
+        ImageUtils.imsave(overlay_volume, "{}/prediction_with_spatial_pcc_overlay_{}.tiff".format(dir_path,image_index))
+        
+        # Save slice as JPG
+        slice_idx = 24#overlay_volume.shape[0] // 2
+        
+        # Create custom red colormap to match the PCC overlay
+        from matplotlib.colors import LinearSegmentedColormap
+        import matplotlib.colors as mcolors
+        colors = [(0, 0, 0), (1, 0, 0)]  # Black to Red
+        n_bins = 16
+        red_cmap = LinearSegmentedColormap.from_list('red', colors, N=n_bins)
+        
+        fig, ax = plt.subplots(figsize=(40, 10))
+        ax.imshow(overlay_volume[slice_idx])
+        ax.axis('off')
+        
+        # Create colorbar using actual PCC values from prediction_to_gt_spatial_pcc
+        norm = mcolors.Normalize(vmin=pcc_normalized.min(), vmax=pcc_normalized.max())
+        sm = cm.ScalarMappable(cmap=red_cmap, norm=norm)
+        sm.set_array([])
+        
+        # Add colorbar on the left side with same height as image
+        cbar = fig.colorbar(sm, ax=ax, location='left', fraction=0.046, pad=0.04, shrink=0.9, aspect=20)
+        cbar.set_label('PCC (Pearson Correlation)', rotation=90, labelpad=15)
+        
+        plt.tight_layout(pad=0)
+        plt.savefig("{}/prediction_with_spatial_pcc_overlay_{}_slice{}.jpg".format(dir_path, image_index, slice_idx), 
+                    bbox_inches='tight', pad_inches=0, dpi=150)
+        plt.close()
+        
+        # prediction_to_noisy_spatial_pcc = calculate_spatial_pcc(unet_noise_p/d,unet_p/d)
+        # prediction_to_noisy_spatial_pcc = np.expand_dims(prediction_to_noisy_spatial_pcc, axis=-1)
+        # ImageUtils.imsave(prediction_to_noisy_spatial_pcc,"{}/prediction_to_noisy_spatial_pcc_{}.tiff".format(dir_path,image_index))
+        
+        # spatial_pcc_for_prediction = calculate_spatial_pcc(prediction_to_gt_spatial_pcc,prediction_to_noisy_spatial_pcc)
+        # spatial_pcc_for_prediction = np.expand_dims(spatial_pcc_for_prediction, axis=-1)
+        # ImageUtils.imsave(spatial_pcc_for_prediction,"{}/prediction_to_gt_to_prediction_to_noisy_spatial_pcc{}.tiff".format(dir_path,image_index))
+        
+        # pcc = pearson_corr((unet_p/d)[:,:,:], (unet_noise_p/d)[:,:,:],target_seg_image_dilated)
+        # pcc_gt = pearson_corr((unet_p/d)[:,:,:], (target_image)[:,:,:],target_seg_image_dilated)
+        # score_for_mask_efficacy_in_pcc = pearson_corr(prediction_to_gt_spatial_pcc,prediction_to_noisy_spatial_pcc)
+        # print("pearson corr for with noisy image:{} is :{}".format(image_index,pcc))
+        # print("pearson corr for gt image:{} is :{}".format(image_index,pcc_gt))
+        # print("pearson corr for both spatial pccs image:{} is :{}".format(image_index,score_for_mask_efficacy_in_pcc))
         
         del unet_p
         del unet_noise_p
@@ -166,10 +239,10 @@ for param in params:
         base_path = os.path.join(os.environ['DATA_PATH'], "spatial_pcc/{}".format(param["model"].split('/')[-1]))
         create_dir_if_not_exist(base_path)
         # ds_path = "{}/merged_dataset.csv".format(base_path)
-        ds_path = os.path.join(os.environ['DATA_PATH'], 'Endosomes/image_list_with_metadata__with_efficacy_scores_full.csv')
-        dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False,image_path_col='combined_image_storage_path')
+        ds_path = os.path.join(os.environ['DATA_PATH'], f'{param["organelle"]}/image_list_test.csv')
+        dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False,image_path_col='path_tiff')
         print("# images in dataset:",dataset.df.data.shape[0])  
-        predict_images_and_calculate_spatial_pcc(dataset,model_path=param["model"],images=[11,12],weighted_pcc=False,noise_scale=param["noise"])            
+        predict_images_and_calculate_spatial_pcc(dataset,model_path=param["model"],images=[1],weighted_pcc=False,noise_scale=param["noise"])            
     except Exception as e:
         print(e)
 

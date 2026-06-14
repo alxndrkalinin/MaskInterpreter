@@ -185,6 +185,8 @@ z_step = 16
 
 batch_size = 4
 
+weighted_pcc = False
+
 def calc_unet_pcc(dataset,model_path=gv.model_path,model=None,images=range(10),weighted_pcc=False):
     """This method run analysis to calc unet model perfermence
     Args:
@@ -449,6 +451,8 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
         histos_fig.set_figwidth(40)
         sum_histos = np.zeros_like(bins)
     count=0
+    if len(images) > len(dataset.df.data):
+        images = range(len(dataset.df.data))
     for image_index in images:
         print("image index: {}/{}".format(count+1,len(images)))
         pccs = []
@@ -624,7 +628,7 @@ def analyze_th(dataset,mode,mask_image=None,manual_th="full",save_image=True,sav
     return pcc_results, mask_results
 
 # analyze_th("regular",save_histo=False,save_image=1,weighted_pcc=weighted_pcc)
-# analyze_th(mode="agg",mask_image=None,manual_th="full",save_image=1,save_histo=False,weighted_pcc=weighted_pcc)
+# analyze_th(mode="agg", mask_image=None, manual_th="full",save_image=5,save_histo=False,weighted_pcc=weighted_pcc)
 # for mth in [0.85]:
     # analyze_th("regular",mask_image=None,manual_th=mth,save_image=True,save_histo=False)
 # analyze_th("mask","{}/X_gradcam_layer_downsample_4_full.tiff".format(gv.model_path)) #gbp_full.tiff #saliency_full.tiff #X_gradcam_layer_downsample_4_full.tiff
