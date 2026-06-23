@@ -117,6 +117,7 @@ from utils.metrics import tf_pearson_corr
 # from metrics import tf_pearson_corr
 from sklearn.model_selection import train_test_split
 from utils.callbacks import *
+import os
 
 # Ensure eager execution (TF2 does this by default)
 tf.compat.v1.enable_eager_execution()
@@ -607,7 +608,7 @@ if __name__ == "__main__":
 
 
     import scipy.stats
-import global_vars as gv
+    import global_vars as gv
 
     # Example: Assuming these dictionaries exist.
     # mask_efficacy_dict = { 'train': np.array([...]), 'val': np.array([...]), ... }
