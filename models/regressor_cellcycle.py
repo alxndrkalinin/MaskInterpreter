@@ -759,7 +759,7 @@ def plot_pred_distributions_01(Y_pred, Y_true=None, bins=60, title_prefix=""):
 
 if __name__ == "__main__":
     # Load pre-split datasets from train/val/test directories
-    base_data_dir = os.path.join(gv.BASE_PATH, 'Gad/Cell_Cycle_Data')
+    base_data_dir = os.path.join(gv.BASE_PATH, 'path/to/Cell_Cycle_Data')
 
     print("\n" + "="*60)
     print("Preparing Training Set (Lazy Loading)")

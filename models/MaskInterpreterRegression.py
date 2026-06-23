@@ -356,7 +356,7 @@ class MaskInterpreterRegression(keras.Model):
 
 if __name__ == "__main__":
     # Load pre-split datasets using lazy loading
-    base_data_dir = os.path.join(gv.BASE_PATH, 'Gad/Cell_Cycle_Data')
+    base_data_dir = os.path.join(gv.BASE_PATH, 'path/to/Cell_Cycle_Data')
     
     print("\n" + "="*60)
     print("Preparing Lazy Loading Datasets")
