@@ -6,9 +6,10 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from tensorflow import keras
 from tensorflow.keras import layers
+import global_vars as gv
 
 load = False
-base_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cifar10')
+base_dir = os.path.join(gv.CWD, 'cifar10')
 # 1. Load and preprocess CIFAR-10 dataset
 print("Loading CIFAR-10 data...")
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()

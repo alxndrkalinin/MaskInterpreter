@@ -8,8 +8,7 @@ import json
 import shutil
 import cv2
 from collections import OrderedDict
-import init_env_vars
-
+import global_vars as gv
 """This script will download the single cell data from the Allen Inst. S3 and will stack all the relevant channels for that cell"""
 ## global vars
 #number of threads to run
@@ -19,9 +18,9 @@ data_provider = quilt3.Bucket("s3://allencell")
 #Path to data location in bucket
 download_path = "aics/hipsc_single_cell_image_dataset/"
 #where to save downloaded data
-storage_root = os.environ['EXAMPLE_DATA_PATH']
+storage_root = gv.DATA_PATH
 #temp location to save data that is being processed (SSD memory)
-temp_storage_root = os.environ['EXAMPLE_DATA_PATH']
+temp_storage_root = gv.DATA_PATH
 #path to metadata.csv
 datasets_metadata_dir = "{}metadata.csv".format(storage_root)
 #max number of images to download

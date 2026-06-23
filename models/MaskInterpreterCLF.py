@@ -113,10 +113,11 @@ import tensorflow as tf
 import tensorflow.keras as keras
 import numpy as np
 import tensorflow_addons as tfa  # if you use any tfa functions
-from metrics import tf_pearson_corr
+from utils.metrics import tf_pearson_corr
 # from metrics import tf_pearson_corr
 from sklearn.model_selection import train_test_split
-from callbacks import *
+from utils.callbacks import *
+import os
 
 # Ensure eager execution (TF2 does this by default)
 tf.compat.v1.enable_eager_execution()
@@ -128,7 +129,7 @@ train = False
 num_samples = 100
 # We'll use a (small) subset from train, val, test for speed.
 num_samples_subset = 500  # adjust as needed
-base_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cifar10')
+base_dir = os.path.join(gv.CWD, 'cifar10')
 
 class MaskInterpreter(keras.Model):
     def __init__(self, patch_size, adaptor, classifier, weighted_pcc, pcc_target=0.9, **kwargs):
@@ -607,6 +608,7 @@ if __name__ == "__main__":
 
 
     import scipy.stats
+    import global_vars as gv
 
     # Example: Assuming these dictionaries exist.
     # mask_efficacy_dict = { 'train': np.array([...]), 'val': np.array([...]), ... }

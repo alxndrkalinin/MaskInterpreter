@@ -3,36 +3,37 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from dataset import DataGen
-from metrics import *
+from utils.metrics import *
 from cell_imaging_utils.image.image_utils import ImageUtils
 import global_vars as gv
 import os
-from utils import get_weights
+from utils.utils import get_weights
 
 #Methods to predict and compare to GT
 gv.model_type = "MG" #"UNET" #"VAE" #"AAE" #"AE" #"CLF" #"RC" #"PM" #"MG"
 for_clf = (gv.model_type == "CLF")
 
 predictors=None #True w_dna
-gv.model_path = "../mg_model_mito_13_05_24_noise_1.5_sim_1.0_target_2.0_mask_1.0_mse"
+gv.model_path = "../mg_model_dna_13_05_24_1.5"
+noise_scale = 1.5
 
 #Input and target channels in the image
 gv.input = "channel_signal"
-gv.target = "channel_target"
+gv.target = "channel_dna"
 
 #Organelle to predict the model upon
-gv.organelle = "Mitochondria" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
-#"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
+gv.organelle = "Nucleolus-(Granular-Component)" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
+#"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #Actomyosin-bundles
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
-gv.test_ds_path = os.path.join(os.environ['DATA_PATH'], "{}/image_list_test.csv".format(gv.organelle))
+gv.test_ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_test.csv".format(gv.organelle))
 
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
 #drug could be either the compound or Vehicle which is like DMSO (the unpertrubed data in the pertrubed dataset)
 drug = compound #"Vehicle"
 if compound is not None:
-    ds_path = os.path.join('/sise', os.environ['REPO_LOCAL_PATH'], "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug))
+    ds_path = os.path.join(gv.CWD, "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug))
 else:
     ds_path = gv.test_ds_path
 
@@ -143,4 +144,4 @@ if (gv.model_type == "UNET"):
 
 elif (gv.model_type == "MG"):
     from mg_analyzer import analyze_th
-    analyze_th(test_dataset,"agg",mask_image=None,manual_th="full",save_image=4,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,)
+    analyze_th(test_dataset,"agg",mask_image=None,manual_th="full",save_image=4,save_histo=False,weighted_pcc = False, model_path=gv.model_path,model=None,compound=None,noise_scale = noise_scale)

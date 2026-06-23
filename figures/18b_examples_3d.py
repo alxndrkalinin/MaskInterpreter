@@ -9,16 +9,16 @@ from figure_config import figure_config,scalebar
 
 
 params = [
-          {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slices":[7,19,30,42]},
-          {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","th":0.40,"slices":[7,19,32,44]},
-          {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","th":0.40,"slices":[7,22,34,48]},
-          {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","th":0.30,"slices":[18,30,44,51]},
-          {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","th":0.02,"slices":[19,32,47,54]},
-          {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","th":0.2,"slices":[22,31,44,51]},
-          {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","th":0.2,"slices":[15,30,42,49]},
-          {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","th":0.10,"slices":[9,17,27,35]},
-          {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","th":0.20,"slices":[13,25,38,56]},
-          {"organelle":"DNA","model":"../mg_model_dna_13_05_24_3.0","th":0.3,"slices":[21,33,39,45]},
+        #   {"organelle":"Nucleolus-(Granular-Component)","model":"../mg_model_ngc_13_05_24_1.5","th":0.60,"slices":[7,19,30,42]},
+        #   {"organelle":"Plasma-membrane","model":"../mg_model_membrane_13_05_24_1.5","th":0.40,"slices":[7,19,32,44]},
+        #   {"organelle":"Endoplasmic-reticulum","model":"../mg_model_er_13_05_24_1.5","th":0.40,"slices":[7,22,34,48]},
+        #   {"organelle":"Golgi","model":"../mg_model_golgi_13_05_24_1.5","th":0.30,"slices":[18,30,44,51]},
+        #   {"organelle":"Actomyosin-bundles","model":"../mg_model_bundles_13_05_24_1.0","th":0.02,"slices":[19,32,47,54]},
+        #   {"organelle":"Mitochondria","model":"../mg_model_mito_13_05_24_1.5","th":0.2,"slices":[22,31,44,51]},
+        #   {"organelle":"Nuclear-envelope","model":"../mg_model_ne_13_05_24_1.0","th":0.2,"slices":[15,30,42,49]},
+        #   {"organelle":"Microtubules","model":"../mg_model_microtubules_13_05_24_1.5","th":0.10,"slices":[9,17,27,35]},
+        #   {"organelle":"Actin-filaments","model":"../mg_model_actin_13_05_24_1.5","th":0.20,"slices":[13,25,38,56]},
+          {"organelle":"DNA","model":"../mg_model_dna_13_05_24_1.5","th":0.3,"slices":[21,33,39,45]},
           ]
 def auto_balance(image):
     """Auto balance the image similar to ImageJ's Auto Contrast function."""
@@ -200,10 +200,10 @@ image_index = 0
 for param in params:
     print(param["organelle"])
     organelle_names.append(param["organelle"])
-    # plot_organelle(examples_per_organelle=4, param = param, save_path=os.path.join(output_dir, '{}_3d.png'.format(param["organelle"])))
+    plot_organelle(examples_per_organelle=4, param = param, save_path=os.path.join(output_dir, '{}_3d.png'.format(param["organelle"])))
 
 # Create the first figure with the first 6 organelles
-create_figure1(num_organelles=6,organelle_names=organelle_names[:6], output_dir=output_dir)
+# create_figure1(num_organelles=6,organelle_names=organelle_names[:6], output_dir=output_dir)
 
 # Create the second figure with the remaining organelles
-create_figure2(num_organelles=4,organelle_names=organelle_names[6:], output_dir=output_dir)
+# create_figure2(num_organelles=4,organelle_names=organelle_names[6:], output_dir=output_dir)

@@ -4,8 +4,9 @@ import numpy as np
 import cv2
 from scipy.ndimage import gaussian_filter
 import tensorflow_addons as tfa
+import global_vars as gv
 
-from metrics import tf_pearson_corr
+from utils.metrics import tf_pearson_corr
 tf.compat.v1.enable_eager_execution()
 
 """Mask Interpreter"""

@@ -137,12 +137,13 @@ from functools import partial
 from tqdm import tqdm
 import gc
 from sklearn.preprocessing import StandardScaler
+import global_vars as gv
 
 # Configuration variables
 load = False  # If True, load pre-trained models instead of training
 adabatch = True  # Enable adaptive batch normalization for test/perturbation sets
 batch_size = 32  # Batch size for training and evaluation
-base_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cell_cycle')  # Directory for saving models and visualizations
+base_dir = os.path.join(gv.CWD, 'cell_cycle')  # Directory for saving models and visualizations
 shuffle_seed = 42  # Random seed for reproducibility
 
 
@@ -758,7 +759,7 @@ def plot_pred_distributions_01(Y_pred, Y_true=None, bins=60, title_prefix=""):
 
 if __name__ == "__main__":
     # Load pre-split datasets from train/val/test directories
-    base_data_dir = os.path.join(os.environ['DATA_MODELS_PATH'], 'Gad/Cell_Cycle_Data')
+    base_data_dir = os.path.join(gv.BASE_PATH, 'Gad/Cell_Cycle_Data')
 
     print("\n" + "="*60)
     print("Preparing Training Set (Lazy Loading)")

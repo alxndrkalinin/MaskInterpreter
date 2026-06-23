@@ -5,10 +5,8 @@ import glob
 import os
 import re
 from figure_config import figure_config
-import init_env_vars
-
 # Path to CSV files
-csv_path = os.path.join(os.environ['DATA_MODELS_PATH'], 'loss graphs/')
+csv_path = os.path.join(gv.BASE_PATH, 'loss graphs/')
 csv_files = glob.glob(f"{csv_path}*.csv")
 csv_files = sorted(csv_files)
 
@@ -114,6 +112,7 @@ for data_info in data_list:
 # ============================================================================
 from matplotlib.patches import Patch
 from matplotlib.gridspec import GridSpecFromSubplotSpec
+import global_vars as gv
 
 if metrics_summary:
     # Find all required configurations
@@ -136,7 +135,7 @@ if metrics_summary:
     configs_t6 = [m for m in metrics_summary if m['sim_weight'] == 1.0 and m['target_weight'] == 6.0 and m['mask_weight'] != 0.0]
     
     # Check if params_comparison.png exists
-    params_img_path = os.path.join(os.environ['REPO_LOCAL_PATH'], 'figures/params_comparison.png')
+    params_img_path = os.path.join(gv.CWD, 'figures/params_comparison.png')
     has_params_img = os.path.exists(params_img_path)
     
     # New layout:
@@ -325,7 +324,7 @@ if metrics_summary:
         ax_params.axis('off')
         ax_params.text(-0.03, 1.03, 'D', transform=ax_params.transAxes, fontsize=10, fontweight='bold', va='top')
     
-    save_path = os.path.join(os.environ['REPO_LOCAL_PATH'], 'figures/ablation_study_combined.png')
+    save_path = os.path.join(gv.CWD, 'figures/ablation_study_combined.png')
     plt.savefig(save_path,
                 bbox_inches='tight', pad_inches=0.1, dpi=300)
     print(f"\nSaved: {save_path}")

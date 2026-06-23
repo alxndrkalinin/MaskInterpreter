@@ -12,8 +12,6 @@ from matplotlib.colors import Normalize
 from matplotlib import colors as mcolors
 import pandas as pd
 from matplotlib.lines import Line2D
-import init_env_vars
-
 def plot_scatter_with_shape_col(x, y, shape_col, title="Scatter plot colored by shape_col"):
     """Plot a scatter plot of x and y, colored by shape_col and axes limited by 2nd and 98th percentiles."""
     
@@ -56,7 +54,7 @@ def plot_scatter_with_shape_col(x, y, shape_col, title="Scatter plot colored by 
 
     # Adjust layout and show plot
     plt.tight_layout()
-    plt.savefig(os.path.join('/sise', os.environ['REPO_LOCAL_PATH'], "figures/{}.png".format(title)))
+    plt.savefig(os.path.join( gv.CWD, "figures/{}.png".format(title)))
 
 def dermi_kde(x, y, x_col="Feature1",y_col="Feature2", n_bins=20, n_mesh=3, plot=True,title=""):
     """Compute Density Resampled Estimate of Mutual Information using KDE."""
@@ -187,7 +185,7 @@ def dermi_kde(x, y, x_col="Feature1",y_col="Feature2", n_bins=20, n_mesh=3, plot
 
         fig.suptitle(title, fontsize=figure_config["organelle"],fontname=figure_config["font"],y=0.92)
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-        plt.savefig(os.path.join('/sise', os.environ['REPO_LOCAL_PATH'], "figures/kde_dermi_{}.png".format(title)))
+        plt.savefig(os.path.join( gv.CWD, "figures/kde_dermi_{}.png".format(title)))
 
     return dremi
 
@@ -304,7 +302,7 @@ def dermi_knn(x, y, x_col="Feature1",y_col="Feature2",k=5, n_bins=20, n_mesh=3, 
 
         fig.suptitle(title, fontsize=figure_config["organelle"], fontname=figure_config["font"],y=0.92)
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-        plt.savefig(os.path.join('/sise', os.environ['REPO_LOCAL_PATH'], "figures/knn_dermi_{}.png".format(title)))
+        plt.savefig(os.path.join( gv.CWD, "figures/knn_dermi_{}.png".format(title)))
 
         return dremi
 
@@ -316,8 +314,9 @@ def _vector_coerce_two_dense(x, y):
     return x, y
 
 # import pandas as pd
+import global_vars as gv
 
-# corr_df = pd.read_csv(os.path.join(os.environ['DATA_PATH'], "unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv"))
+# corr_df = pd.read_csv(os.path.join(gv.DATA_PATH, "unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv"))
 # x_col = '../mg_model_membrane_13_05_24_1.5'
 # y_col = '../unet_model_22_05_22_membrane_128'
 
@@ -343,7 +342,7 @@ def _vector_coerce_two_dense(x, y):
 # print("kNN-DREMI:", dremi_value_knn)
 # plot_scatter_with_shape_col(x,y,corr_df_temp['Workflow'].values,"scatter_{}".format("Plasma-membrane"))
 
-# # corr_df = pd.read_csv(os.path.join(os.environ['REPO_LOCAL_PATH'], "figures/dna_correlation.csv"))
+# # corr_df = pd.read_csv(os.path.join(gv.CWD, "figures/dna_correlation.csv"))
 # x_col = '../mg_model_dna_13_05_24_1.5b'
 # y_col = '../unet_model_22_05_22_dna_128'
 
@@ -382,13 +381,13 @@ params = [
     # {"organelle":"Actomyosin bundles", "y_col":"../unet_model_22_05_22_bundles_128", "x_col":"../mg_model_bundles_13_05_24_1.0","drop":None},
     # {"organelle":"Endoplasmic reticulum", "y_col":"../unet_model_22_05_22_er_128", "x_col":"../mg_model_er_13_05_24_1.5","drop":[1]},
 ]
-corr_df = pd.read_csv(os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv'))
+corr_df = pd.read_csv(os.path.join(gv.BASE_PATH, 'full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores.csv'))
 drug_label = ['s-Nitro-Blebbistatin']#,'Staurosporine'] #,'Staurosporine'
 # corr_df = corr_df[ ~(corr_df['drug_label'].isin(drug_label))]
 
 for param in params:
     print(param["organelle"])
-    corr_df = pd.read_csv(os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores_embeddings_{}.csv'.format(param["organelle"])))
+    corr_df = pd.read_csv(os.path.join(gv.BASE_PATH, 'full_cells_fovs_perturbation/train_test_list/unet_predictions/metadata_with_efficacy_scores_and_unet_scores_embeddings_{}.csv'.format(param["organelle"])))
     
     x_col = param["x_col"]
     y_col = param["y_col"]

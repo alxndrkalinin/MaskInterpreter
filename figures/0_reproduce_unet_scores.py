@@ -7,7 +7,6 @@ import global_vars as gv
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
 from mg_analyzer import calc_unet_pcc
 from figure_config import figure_config
-import init_env_vars
 
 params = [
           {"organelle":"Nuclear-envelope","model":"../unet_model_22_05_22_ne_128"},
@@ -63,7 +62,7 @@ def plot_unet_scores():
 
 for param in params:
     print(param["organelle"])
-    ds_path = os.path.join(os.environ['DATA_PATH'], "{}/image_list_test.csv".format(param["organelle"]))
+    ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_test.csv".format(param["organelle"]))
     dataset = DataGen(ds_path, gv.input, gv.target, batch_size=1, num_batches=1, patch_size=gv.patch_size, min_precentage=0.0, max_precentage=1.0, augment=False)
     calc_unet_pcc(dataset, model_path=param["model"], weighted_pcc=weighted_pcc,images=range(min(10,dataset.df.data.shape[0])))
 

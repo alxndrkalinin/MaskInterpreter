@@ -4,11 +4,10 @@ import tensorflow as tf
 import tensorflow.keras as keras
 from dataset import DataGen
 import global_vars as gv
-from callbacks import *
-from metrics import *
+from utils.callbacks import *
+from utils.metrics import *
 import pandas as pd
-from utils import *
-import init_env_vars
+from utils.utils import *
 
 CONTINUE_TRAINING = False ## False to override current model with the same name
 
@@ -16,27 +15,27 @@ CONTINUE_TRAINING = False ## False to override current model with the same name
 gv.model_type = "MG"
 
 #If Mask Interpreter then add the path to the model you want to interpret
-gv.interpert_model_path = "../unet_model_22_05_22_ne_128" ## UNET model if in MG mode it is the model that we want to interpret
+gv.interpert_model_path = "../unet_model_22_05_22_dna_128" ## UNET model if in MG mode it is the model that we want to interpret
 #path to the model
-gv.model_path = "../mg_model_ne_13_05_24_noise_1.5_sim_0.0_target_6.0_mask_1.0_mse" ## the model will be saved here
+gv.model_path = "../mg_model_dna_13_05_24_1.5_new" ## the model will be saved here
 
 #Input and target channels in the image
 gv.input = "channel_signal"
-gv.target = "channel_target"
+gv.target = "channel_dna"
 
 #Organelle to train the model upon
-gv.organelle = "Nuclear-envelope" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
+gv.organelle = "Nucleolus-(Granular-Component)" #"Actomyosin-bundles"#"Golgi" #"Plasma-membrane" #"Microtubules" #"Actin-filaments" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)" #"Tight-junctions" #"Endoplasmic-reticulum" 
 
 #Assemble the proper tarining csvs by the organelle, model type, and if the data is pertrubed or not
-gv.train_ds_path = os.path.join(os.environ['DATA_PATH'], "{}/image_list_train.csv".format(gv.organelle))
-gv.test_ds_path = os.path.join(os.environ['DATA_PATH'], "{}/image_list_test.csv".format(gv.organelle))
+gv.train_ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_train.csv".format(gv.organelle))
+gv.test_ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_test.csv".format(gv.organelle))
 
 #if compound is not None then it will take pertrubed dataset
 compound = None #"s-Nitro-Blebbistatin" #"s-Nitro-Blebbistatin" #"Staurosporine" #None #"s-Nitro-Blebbistatin" #None #"paclitaxol_vehicle" #None #"paclitaxol_vehicle" #"rapamycin" #"paclitaxol" #"blebbistatin" #""
 #drug could be either the compound or Vehicle which is like DMSO (the unpertrubed data in the pertrubed dataset)
 drug = compound #"Vehicle"
 if compound is not None:
-    ds_path = os.path.join(os.environ['REPO_LOCAL_PATH'], "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug))
+    ds_path = os.path.join(gv.CWD, "single_cell_training_from_segmentation_pertrub/{}_{}/image_list_test_{}.csv".format(gv.organelle,compound,drug))
 else:
     ds_path = gv.train_ds_path
     
@@ -69,8 +68,8 @@ if (gv.model_type == "UNET"):
 elif (gv.model_type == "MG"):
     from models.MaskInterpreter import *
     from models.UNETO import *
-    similiarity_loss_weight = 0.0  # 1.0 default
-    target_loss_weight = 6.0 #10.0 is the default value 
+    similiarity_loss_weight = 1.0  # 1.0 default
+    target_loss_weight = 10.0 #10.0 is the default value 
     mask_loss_weight=1.0 #1.0 is the default value 
     noise_scale = 1.5 #value according to find_noise_scale
     

@@ -5,13 +5,13 @@ import tensorflow as tf
 import tensorflow.keras as keras
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
 from cell_imaging_utils.image.image_utils import ImageUtils
-from utils import *
+from utils.utils import *
 import numpy as np
 from tqdm import tqdm
 import sklearn as sklearn
 import cv2
 from patchify import patchify
-import init_env_vars
+import global_vars as gv
 
 def get_size_in_GB(start_path = '.'):
     total_size = 0
@@ -89,7 +89,7 @@ class DataGen(keras.utils.Sequence):
                  #True for outputing labels for clf
                  for_clf = False):
 
-        self.new_path_origin = os.path.join(os.environ['DATA_PATH'], 'temp')
+        self.new_path_origin = os.path.join(gv.DATA_PATH, 'temp2')
         if delete_cahce:
             if os.path.exists(self.new_path_origin):
                 shutil.rmtree(self.new_path_origin)
@@ -161,7 +161,7 @@ class DataGen(keras.utils.Sequence):
         except Exception as e:
                 print("SSD storage is not exist in {}".format(self.new_path_origin))
                 print(e)
-                self.new_path_origin = os.path.join(os.environ['DATA_PATH'], 'temp/{}'.format(os.environ['LOGNAME']))
+                self.new_path_origin = os.path.join(gv.DATA_PATH, 'temp/{}'.format(os.environ['LOGNAME']))
                 if (not os.path.exists(self.new_path_origin)):
                     os.makedirs(self.new_path_origin)
 

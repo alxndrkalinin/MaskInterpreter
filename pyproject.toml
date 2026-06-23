@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cell_generator"
-version = "0.1.0"
+version = "1.0.0"
 description = "Cell generator and mask interpreter for interpretable cell image analysis"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -25,8 +25,10 @@ dependencies = [
     "quilt3>=1.0.0",
     "cell-imaging-utils>=1.17.1",
     "imagecodecs",
+    "matplotlib-scalebar"
 ]
 
 [tool.setuptools]
 packages = ["create_data", "figures", "gui", "models"]
-py-modules = ["callbacks", "dataset", "global_vars", "metrics", "mg_analyzer", "test", "train", "utils"]
+py-modules = ["dataset", "global_vars", "mg_analyzer", "test", "train"]
+packages = ["utils", "models", "gui", "figures", "create_data"]

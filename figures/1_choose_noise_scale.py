@@ -72,7 +72,7 @@ def plot_noise_scale_analysis():
 
 # for param in params:
 #     print(param["organelle"])
-#     ds_path = os.path.join(os.environ['DATA_PATH'], "{}/image_list_train.csv".format(param["organelle"]))
+#     ds_path = os.path.join(gv.DATA_PATH, "{}/image_list_train.csv".format(param["organelle"]))
 #     dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False)
 #     find_noise_scale(dataset,model_path=param["model"],weighted_pcc=weighted_pcc)
 plot_noise_scale_analysis()

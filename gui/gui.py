@@ -1,11 +1,10 @@
 import PySimpleGUI as sg
 from gui.gui_logic import *
 import io
+import global_vars as gv
 from PIL import Image
 import numpy as np
 import cv2
-import init_env_vars
-
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -13,8 +12,8 @@ for gpu in gpus:
   tf.config.experimental.set_memory_growth(gpu, True)
 
 gv.patch_size = (32,128,128,1)
-gv.unet_model_path = os.path.join(os.environ['REPO_LOCAL_PATH'], 'unet_model_22_05_22_ne_128')
-gv.mg_model_path = os.path.join(os.environ['REPO_LOCAL_PATH'], 'mg_model_ne_10_06_22_5_0_new')
+gv.unet_model_path = os.path.join(gv.CWD, 'unet_model_22_05_22_ne_128')
+gv.mg_model_path = os.path.join(gv.CWD, 'mg_model_ne_10_06_22_5_0_new')
 gv.organelle = "Nuclear-envelope" #"Tight-junctions" #Actin-filaments" #"Golgi" #"Microtubules" #"Endoplasmic-reticulum" 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
 
@@ -40,7 +39,7 @@ upper_layout = [
         sg.Input(
             key='-DATASET-',
             default_text=
-            os.path.join('/sise', os.environ['REPO_LOCAL_PATH'], "single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)),
+            os.path.join( gv.CWD, "single_cell_training_from_segmentation/{}/image_list_train.csv".format(gv.organelle)),
             size=(100, 1)),
         sg.FileBrowse(target='-DATASET-'),
         sg.Button('Load')
