@@ -160,11 +160,11 @@ import gc
 import tensorflow as tf
 import tensorflow.keras as keras
 from dataset import DataGen
-from metrics import *
+from utils.metrics import *
 from cell_imaging_utils.image.image_utils import ImageUtils
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
 import global_vars as gv
-from utils import *
+from utils.utils import *
 import os
 import matplotlib.pyplot as plt
 import cv2

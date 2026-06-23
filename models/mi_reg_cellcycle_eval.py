@@ -150,7 +150,7 @@ import tensorflow as tf
 from tensorflow import keras
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from metrics import tf_pearson_corr
+from utils.metrics import tf_pearson_corr
 
 ###############--SETTINGS--##########################
 num_samples = 100  # Number of samples to visualize
@@ -164,8 +164,8 @@ from models.regressor_cellcycle import get_file_list, compute_dataset_statistics
 
 if __name__ == "__main__":
     # Load dataset
-    base_data_dir = os.path.join(os.environ['DATA_MODELS_PATH'], 'Gad/Cell_Cycle_Data')
-    base_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cell_cycle')
+    base_data_dir = os.path.join(gv.BASE_PATH, 'Gad/Cell_Cycle_Data')
+    base_dir = os.path.join(gv.CWD, 'cell_cycle')
     
     print("\n" + "="*60)
     print("Preparing Lazy Loading for Evaluation")
@@ -226,6 +226,7 @@ if __name__ == "__main__":
     # Load mask interpreters
     from models.MaskInterpreterRegression import MaskInterpreterRegression
     from models.UNETO import get_unet
+import global_vars as gv
     
     # Create adaptors
     adaptor_m1 = get_unet((64, 64, 2), activation="sigmoid")
@@ -508,7 +509,7 @@ if __name__ == "__main__":
         print("="*60)
         
         # Create predictions directories next to images and labels
-        base_data_dir = os.path.join(os.environ['DATA_MODELS_PATH'], 'Gad/Cell_Cycle_Data')
+        base_data_dir = os.path.join(gv.BASE_PATH, 'Gad/Cell_Cycle_Data')
         predictions_dir_m1 = os.path.join(base_data_dir, dataset_to_visualize, "predictions_marker1")
         predictions_dir_m2 = os.path.join(base_data_dir, dataset_to_visualize, "predictions_marker2")
         

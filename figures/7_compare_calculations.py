@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from figure_config import figure_config
 import os
 import tensorflow as tf
-import init_env_vars
 
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 print("GPUs Available: ", tf.config.list_physical_devices('GPU'))
@@ -24,7 +23,7 @@ gv.patch_size = (32,128,128,1)
 
 
 #"Plasma-membrane" #"Nuclear-envelope" #"Mitochondria" #"Nucleolus-(Granular-Component)"
-base_dir = os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs')
+base_dir = os.path.join(gv.BASE_PATH, 'full_cells_fovs')
 X_gradcam = False
 layer_name = "unet_convt_bottleneck2"
 

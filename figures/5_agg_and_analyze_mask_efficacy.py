@@ -7,10 +7,9 @@ from tqdm import tqdm
 from scipy.stats import mannwhitneyu
 import math
 from figure_config import figure_config
-import init_env_vars
-
+import global_vars as gv
 # Define the path to your CSV files
-path = os.path.join(os.environ['DATA_PATH'], '**/image_list_with_metadata__with_efficacy_scores_full.csv')
+path = os.path.join(gv.DATA_PATH, '**/image_list_with_metadata__with_efficacy_scores_full.csv')
 
 # Print the path pattern
 print(f"Using path pattern: {path}")
@@ -34,7 +33,7 @@ else:
     metadata_with_efficacy_scores_df = pd.concat(dfs, ignore_index=True)
     print("metadata_with_efficacy_scores_df # FOVS:{}".format(metadata_with_efficacy_scores_df.shape[0]))
     
-    metadata_with_efficacy_scores_df.to_csv(os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv'), index=False)
+    metadata_with_efficacy_scores_df.to_csv(os.path.join(gv.BASE_PATH, 'full_cells_fovs/train_test_list/image_list_with_metadata__with_efficacy_scores_full_all.csv'), index=False)
 
     # List of columns to plot unique values for
     columns_to_plot = ['Workflow']
@@ -50,7 +49,7 @@ else:
     plt.title('Number of Unique Values for Each Column')
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
-    plt.savefig(os.path.join('/sise', os.environ['REPO_LOCAL_PATH'], 'figures/unique_values_plot.png'))
+    plt.savefig(os.path.join(gv.CWD, 'figures/unique_values_plot.png'))
     plt.show()
 
     # Print unique values for each column
@@ -95,8 +94,8 @@ def plot_box_plots(data, columns, params):
             else:
                 control_organelle = param["organelle"]
                 
-            train_test_df = pd.read_csv(os.path.join(os.environ['DATA_MODELS_PATH'], f'full_cells_fovs/train_test_list/{control_organelle}/image_list_with_metadata__with_efficacy_scores_full.csv'))
-            test_df = pd.read_csv(os.path.join(os.environ['DATA_MODELS_PATH'], f'full_cells_fovs/train_test_list/{control_organelle}/image_list_test.csv'))
+            train_test_df = pd.read_csv(os.path.join(gv.BASE_PATH, f'full_cells_fovs/train_test_list/{control_organelle}/image_list_with_metadata__with_efficacy_scores_full.csv'))
+            test_df = pd.read_csv(os.path.join(gv.BASE_PATH, f'full_cells_fovs/train_test_list/{control_organelle}/image_list_test.csv'))
             control_df = pd.merge(train_test_df, test_df['path_tiff'], how='inner', left_on='combined_image_storage_path', right_on='path_tiff')
             control_structure = control_df['StructureShortName'].values[0]
             
@@ -145,7 +144,7 @@ def plot_box_plots(data, columns, params):
             fig.delaxes(axes.flatten()[idx])
         
         # plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.savefig(os.path.join('/sise', os.environ['REPO_LOCAL_PATH'], f'figures/{x_col}_comparison_main2.png'), bbox_inches='tight',pad_inches=0.05)
+        plt.savefig(os.path.join(gv.CWD, f'figures/{x_col}_comparison_main2.png'), bbox_inches='tight',pad_inches=0.05)
         plt.close()
 
 # Plot box plots for each specified column and result column

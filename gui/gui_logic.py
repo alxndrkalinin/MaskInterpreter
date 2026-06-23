@@ -3,13 +3,13 @@ import tensorflow as tf
 from scipy import signal
 import tensorflow.keras as keras
 from dataset import DataGen
-from metrics import *
+from utils.metrics import *
 from cell_imaging_utils.image.image_utils import ImageUtils
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
-from metrics import *
+from utils.metrics import *
 from dataset import DataGen
 import global_vars as gv
-from utils import *
+from utils.utils import *
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
@@ -18,9 +18,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from figures.figure_config import figure_config
-import init_env_vars
 
-root_dir = os.environ['REPO_LOCAL_PATH']
+root_dir = gv.CWD
 
 xy_step = 64
 z_step = 16
@@ -519,5 +518,5 @@ def load_scores(interpreter):
     scores_long = scores_long.rename(columns={'**': 'Pearson'})
     return scores_long
 
-# gv.mg_model_path = os.path.join(os.environ['REPO_LOCAL_PATH'], "mg_model_mito_10_06_22_5_0_new")
+# gv.mg_model_path = os.path.join(gv.CWD, "mg_model_mito_10_06_22_5_0_new")
 # plot_evaluation_graph_std("{}/comparison.svg".format(gv.mg_model_path),["saliency","gradcam","mask_interperter"])

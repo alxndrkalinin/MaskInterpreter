@@ -1,22 +1,21 @@
 import os
 import numpy as np
 from cell_imaging_utils.datasets_metadata.table.datasetes_metadata_csv import DatasetMetadataSCV
-import init_env_vars
-
+import global_vars as gv
 """This script will create train and test lists in csv file for unpertrubed data, this script need to be run after the download_and_create script"""
 ## global vars
 #use False if this list is only for 1 organelle and then there will be different csv files for each organelle
 #and True if you wnt the same files for all organlles
 GLOBAL_LIST = False
 #The path to where the metadata of the downloaded images
-storage_root = os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation/') 
+storage_root = os.path.join(gv.BASE_PATH, 'full_cells_fovs_perturbation/') 
 #path to save to lists in the end
 if GLOBAL_LIST:
-  lists_root_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cell_generator')
+  lists_root_dir = os.path.join(gv.CWD, 'cell_generator')
 else:
-  lists_root_dir = os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation/train_test_list/')
+  lists_root_dir = os.path.join(gv.BASE_PATH, 'full_cells_fovs_perturbation/train_test_list/')
 #what organelles to process
-organelles=os.path.join(os.environ['DATA_MODELS_PATH'], 'full_cells_fovs_perturbation/') #{"Golgi":[],"Microtubules":[],"Nuclear-envelope":[],"Actin-filaments":[],"Plasma-membrane":[],"Nucleolus-(Dense-Fibrillar-Component)":[],"Mitochondria":[],"Endoplasmic-reticulum":[],"Tight-junctions":[],"Nucleolus-(Granular-Component)":[],"Actomyosin-bundles":[],"Desmosomes":[]}
+organelles=os.path.join(gv.BASE_PATH, 'full_cells_fovs_perturbation/') #{"Golgi":[],"Microtubules":[],"Nuclear-envelope":[],"Actin-filaments":[],"Plasma-membrane":[],"Nucleolus-(Dense-Fibrillar-Component)":[],"Mitochondria":[],"Endoplasmic-reticulum":[],"Tight-junctions":[],"Nucleolus-(Granular-Component)":[],"Actomyosin-bundles":[],"Desmosomes":[]}
 #% of images to be in the trainin set, the rest will be in the test set
 train_p = 0.0
 

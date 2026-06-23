@@ -147,8 +147,8 @@ Dependencies:
 import tensorflow as tf
 import tensorflow.keras as keras
 import numpy as np
-from metrics import tf_pearson_corr
-from callbacks import *
+from utils.metrics import tf_pearson_corr
+from utils.callbacks import *
 import os
 import glob
 import importlib
@@ -167,7 +167,7 @@ adabatch = True
 # Number of samples to visualize
 num_samples = 100
 num_samples_subset = 500
-base_dir = os.path.join(os.environ['REPO_LOCAL_PATH'], 'cell_cycle')
+base_dir = os.path.join(gv.CWD, 'cell_cycle')
 
 class MaskInterpreterRegression(keras.Model):
     def __init__(self, patch_size, adaptor, regressor, pcc_target=0.9, **kwargs):
@@ -356,7 +356,7 @@ class MaskInterpreterRegression(keras.Model):
 
 if __name__ == "__main__":
     # Load pre-split datasets using lazy loading
-    base_data_dir = os.path.join(os.environ['DATA_MODELS_PATH'], 'Gad/Cell_Cycle_Data')
+    base_data_dir = os.path.join(gv.BASE_PATH, 'Gad/Cell_Cycle_Data')
     
     print("\n" + "="*60)
     print("Preparing Lazy Loading Datasets")
@@ -407,6 +407,7 @@ if __name__ == "__main__":
         
         # Load a batch for adaptation
         from models.regressor_cellcycle import load_sample_from_file
+import global_vars as gv
         adapt_samples = []
         adapt_count = 0
         adapt_batch_size = 1000

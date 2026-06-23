@@ -1,42 +1,126 @@
-# MaskInterpreter
+# MaskInterpreter | Trustworthy in silico labeling via semantic visual interpretability of image-to-image translation
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 
-## Overview
+Lion Ben Nedava<sup>1*</sup>, Gad Miller<sup>1*</sup>, Nitsan Elmalam<sup>1</sup>, Mateheus Viana<sup>3</sup>, Jianxu Chen<sup>2</sup>, Nathalie Gaudreault<sup>3</sup>, Sussane Rafelski<sup>3</sup>, Assaf Zaritsky<sup>1</sup>
 
-Deep learning models often operate as "black boxes," making it difficult to understand which input features drive their predictions. MaskInterpreter addresses this by learning a mask generator network that identifies important regions through a novel training objective:
+\*Equal contribution
+
+1. Institute for Interdisciplinary Computational Science, Stein Faculty of Computer and Information Science, Ben-Gurion University of the Negev, Beer-Sheva 84105, Israel
+2. Leibniz-Institut fur Analytische Wissenschaften - ISADS - e.V, Dortmund, Germany
+3. Allen Institute for Cell Science, Seattle, WA, USA
+
+## 1. Abstract
+
+Cross-modality image translation promises to provide multiple layers of biological information from a single input, yet its practical application is stalled by a lack of interpretability and the inability to account for model imperfections. In silico labeling, the inference of organelle localization from label-free images, is a primary example where this black-box nature limits adoption. We present Mask Interpreter, a generalized method for semantic visual interpretability of image-to-image translation models. By uncovering organelle-specific "explanation signatures", we demonstrate that models leverage unique and reproducible biological patterns. Mask Interpreter outperforms traditional xAI approaches, identifies batch effects and localized prediction errors when ground-truth fluorescence is unavailable. Our supervised confidence modeling provides fine-grained reliability assessment at single-cell resolution, enabling the automated exclusion of artifacts from downstream analyses. By bridging the gap between computational inference and meaningful biological features, Mask Interpreter transforms in silico labeling into a rigorous, evidence-based instrument for scientific discovery across diverse biomedical imaging modalities.
+
+<p align="center">
+  <img src="figures/figure1.png" alt="MaskInterpreter Architecture" height="600"/>
+</p>
+
+**Figure 1. Interpreting in silico labeling using Mask Interpreter**. (A) Training of in silico labeling models using matched label-free and fluorescence images. (B) Example of predictions with/without using MaskInterpreter’s importance mask. (C-F) Training and inference pipeline schematic. 
+
+See Paper (link) for details.
+
+## 2. Overview
+Deep learning models often operate as "black boxes," making it difficult to understand which input features drive their predictions. MaskInterpreter addresses this by learning a per-organelle mask generator network that identifies important regions through a novel training objective:
 
 - **Preserve predictions**: Important regions (high mask values) should be sufficient to maintain the model's original prediction
 - **Minimize mask size**: The mask should be as minimal as possible, highlighting only truly essential regions
-- **Target correlation**: Predictions on masked inputs should maintain a specified correlation with original predictions
+- **Target correlation**: Predictions on masked inputs should maintain a specified correlation with the original predictions
 
 ### Key Features
-
 - **Self-supervised training** - No ground truth explanations needed
-- **Model-agnostic** - Works with any differentiable predictor (classifiers, regressors, image-to-image models)
-- **Quantifiable explanations** - Mask efficacy measured via Pearson Correlation Coefficient (PCC)
+- **Model-agnostic** - Works with any differentiable predictor (e.g. classifiers, regressors, image-to-image models)
+- **New measurement to quantify explanations** - the Pearson correlation coefficient (PCC) between the predictions derived from the unperturbed input, and the predictions derived from the importance mask-induced noisy inputs
 
-> **PyTorch Implementation**: For a PyTorch version of MaskInterpreter and tools for supervised prediction quality assessment at inference using MaskInterpreter, see the companion repository: [https://github.com/zaritskylab/Interpretability](https://github.com/zaritskylab/Interpretability)
+## 3. Repository Structure
 
+```
+mask_interpreter/
+├── README.md
+├── pyproject.toml              # Package dependencies and configuration
+├── example.ipynb               # Quick start tutorial notebook
+│
+├── models/                     # Core MaskInterpreter implementations
+│   ├── MaskInterpreter.py      # Image-to-image models
+│   ├── MaskInterpreterRegression.py   # Regression models
+│   ├── MaskInterpreterCLF.py   # Classification models
+│   ├── regressor_cellcycle.py  # Cell cycle marker regression
+│   ├── clf-cifar10.py          # CIFAR-10 classifier
+│   └── UNETO.py                # U-Net architecture for mask generation
+│
+├── create_data/                # Data download and preparation scripts
+│   ├── download_and_create_dataset_full.py
+│   ├── download_and_create_dataset_singlecell.py
+│   ├── create_metadata.py
+│   └── segment_and_create_pertrub_dataset.py
+│
+├── figures/                    # Scripts to reproduce paper figures
+│   ├── 0_reproduce_unet_scores.py
+│   ├── 1_choose_noise_scale.py
+│   ├── 2_choose_th.py
+│   ├── 3_calculate_unet_scores.py
+│   ├── 4_calculate_explanation_mask_efficacy.py
+│   └── ...
+│
+├── gui/                        # Graphical user interface
+│   ├── gui.py
+│   └── gui_logic.py
+│
+├── utils/                      # Utility modules
+│   ├── callbacks.py            # Training callbacks
+│   ├── metrics.py              # Evaluation metrics (PCC, etc.)
+│   └── utils.py                # Helper functions
+│
+├── dataset.py                  # Data loading utilities
+├── global_vars.py              # Global configuration and paths
+├── mg_analyzer.py              # Mask generator analyzer
+├── train.py                    # Main training script
+└── test.py                     # Testing utilities
+```
 
-<p align="center">
-  <img src="figures/figure1.png" alt="MaskInterpreter Architecture" width="800"/>
-</p>
-
-**Figure 1. Interpreting in silico labeling using Mask Interpreter**. (A) In silico labeling. Training (left): organelle-specific in silico labeling models are trained using matched label-free and their corresponding organelle-specific fluorescence images. Inference (right): pre-trained in silico labeling models are used to computationally translate each label-free image to multiple in silico labeled organelles’ fluorescence images. (B) An example showing the Nucleoli’s in silico labeling from the unperturbed bright-field image (top) and from the noisy bright-field image (bottom). The noisy image is generated by adding Gaussian noise to regions deemed less important by the Mask Interpreter’s derived importance mask. Arrows point to unimportant regions to which noise was added (red) and important regions that were kept intact (green). Note that both in silico labeled predictions are similar, indicating that the in silico labeling model primarily relies on the regions in the bright-free that were deemed as important by Mask Interpreter. Scale bar = 20 μm. (C-F) Schematic of the Mask Interpreter training and inference pipeline. (C) Importance Mask: The Mask Interpreter generates an importance mask using the bright-field image and its corresponding pre-trained in silico labeling model’s prediction. Scale bar = 20 μm. (D) Noise Application: A noisy bright-field image is constructed by adding Gaussian noise to the original image. The noise at each voxelspixel is modulated by the importance mask introducing more noise in less important regions. (E) Prediction: The pre-trained in silico labeling model is applied to the noisy bright-field image to generate an in silico labeled prediction. The optimization process minimizes the integrated voxelspixel values in the importance mask (maximizing noise) while simultaneously ensuring the in silico prediction from the noisy bright-field image remains highly correlated (PCC ≥ 0.9) and similar (minimum MSE) to the prediction from the unperturbed bright-field image (see text and Methods). (F) Inference: The trained Mask Interpreter generates an importance mask that is thresholded to create the binarized explanation signature which provides intuitive visual explanations of the image-to-image translation model's inner workings.
-
-<p align="center">
-  <img src="figures/figure2.png" alt="MaskInterpreter Architecture" width="800"/>
-</p>
-
-**Figure 2. Explanation signatures reveal organelle-specific stereotypical regions that are essential for in silico localization**. (A-D) A manually selected in-focus z-slice of a representative field of view is shown for each organelle with an overlay of the explanation signature (light teal) and the segmented fluorescence image (purple, see Methods). Light purple regions indicate the intersection between the explanation signature and the segmentation (top). The bottom quartet shows the corresponding (top-left to bottom-right) bright-field image, fluorescence image, in silico prediction from the noisy bright-field image (“noisy prediction”) and the in silico labeling from the unperturbed bright-field image (“prediction”)(E) Manual and gradual introduction of noise in the bright-field image regions corresponding to the nuclear interior (top, in green) diminished the efficacy quality of the in silico Nuclear envelope prediction, efficacy was measured by pearson correlation between predictions of noisy and original bright-filed images (bottom). This direct manipulation underscores the importance of the nucleus in providing the spatial context necessary for accurately localizing the Nuclear envelope. (F) Manual and gradual introduction of noise in the bright-field image, in the single cell resolution. Bright-field image regions corresponding to the nuclear interior did not diminish the efficacy of the single cell in silico model prediction.
-
-
-## Installation
+## 4. General Installation and setup
 
 ### Prerequisites
 
 - Python 3.9+
 - CUDA-compatible GPU (recommended)
 - Conda (recommended for environment management)
+
+### Download Trained Models and Example Data
+
+Pre-trained models and example data are available from Zenodo for quick start and reproducibility.
+
+#### Download from Zenodo
+
+Visit the Zenodo repository to download the required files:
+
+**Zenodo Link:** [https://zenodo.org/records/18590674](https://zenodo.org/records/18590674)
+
+The archive contains:
+- **Pre-trained in silico labeling models** - Trained on various organelles
+- **Pre-trained MaskInterpreter models** - Corresponding interpretation models for each predictor
+- **Example data** - Sample images with metadata for testing and validation
+- **Train and test lists of the full data**
+
+#### Extraction and Setup
+
+After downloading, extract the contents and set the paths accordingly:
+
+```bash
+# Download the archive from Zenodo
+wget https://zenodo.org/records/18590674/files/models_and_data.zip
+
+# Extract to your desired location
+unzip models_and_data.zip -d /path/to/your/directory
+
+# The extracted files under models_and_data dir will contain:
+# - example_data (example dataset with train/test CSV files)
+# - models/ (pre-trained models)
+# - train_test_list/ (train and test lists of the full data)
+```
+
+Make sure to update your environment variables (see next section) to point to these directories.
 
 ### Setup
 
@@ -62,100 +146,46 @@ This will install all dependencies from `pyproject.toml` automatically
 
 ### Verify Installation
 
-```python
+**Note**: Run this verification on the terminal of the computer/node with GPU access.
+
+```bash
+# Activate the environment
+conda activate maskinterpreter
+
+# Run verification script
+python -c "
+import warnings
+warnings.filterwarnings('ignore')
+
 import tensorflow as tf
-print("GPUs Available:", tf.config.list_physical_devices('GPU'))
+print('GPUs Available:', tf.config.list_physical_devices('GPU'))
 
 from models.MaskInterpreter import MaskInterpreter
-print("MaskInterpreter imported successfully!")
+print('MaskInterpreter imported successfully!')
+"
 ```
 
-## Download Trained Models and Example Data
+### Configuration
 
-Pre-trained models and example data are available from Zenodo for quick start and reproducibility.
+The project uses `global_vars.py` for configuration including paths for data, models, and the repository. You can configure these either by:
 
-### Download from Zenodo
+Open [global_vars.py](global_vars.py) and update the path variables at the top of the file:
 
-Visit the Zenodo repository to download the required files:
-
-**Zenodo Link:** [https://zenodo.org/records/18590674](https://zenodo.org/records/18590674)
-
-The archive contains:
-- **Pre-trained in silico labeling models** - Trained on various organelles
-- **Pre-trained MaskInterpreter models** - Corresponding interpretation models for each predictor
-- **Example data** - Sample images with metadata for testing and validation
-
-### Extraction and Setup
-
-After downloading, extract the contents and set the paths accordingly:
-
-```bash
-# Download the archive from Zenodo
-wget https://zenodo.org/records/18590674/files/models_and_data.zip
-
-# Extract to your desired location
-unzip models_and_data.zip -d /path/to/your/directory
-
-# The extracted files will contain:
-# - models/ (pre-trained models)
-# - data/ (example dataset with train/test CSV files)
-```
-
-Make sure to update your environment variables (see next section) to point to these directories.
-
-## Environment Variables
-
-The project uses environment variables to configure paths for data, models, and the repository. You should set these before running scripts or notebooks:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `REPO_LOCAL_PATH` | Root path to the cloned repository | `/home/username/cell_generator` |
-| `DATA_PATH` | Directory containing training/test CSV files | `/path/to/data/train_test_list/` |
-| `MODELS_PATH` | Directory containing pre-trained models | `/path/to/models/` |
-
-### Setting Environment Variables
-
-**In your shell (bash):**
-```bash
-export REPO_LOCAL_PATH="/home/username/cell_generator"
-export DATA_PATH="/path/to/data/train_test_list/"
-export MODELS_PATH="/path/to/models/"
-```
-
-**In Python scripts or notebooks:**
 ```python
-import os
-os.environ['REPO_LOCAL_PATH'] = "/home/username/cell_generator"
-os.environ['DATA_PATH'] = "/path/to/data/train_test_list/"
-os.environ['MODELS_PATH'] = "/path/to/models/"
+# ============================================
+# Path Configuration
+# ============================================
+# Base paths - update these to match your environment
+DATA_MODELS_PATH = '/path/to/your/data'
+DATA_PATH = '/path/to/your/data/train_test_list'
+MODELS_PATH = '/path/to/your/models'
+REPO_LOCAL_PATH = 'current working dir'
+EXAMPLE_DATA_PATH = '/path/to/example_data/'
 ```
 
-## Quick Start with Example Notebook
+**Note**: Those variables must be set **before** importing any project modules.
 
-The [example.ipynb](example.ipynb) notebook provides a complete walkthrough of loading a pre-trained MaskInterpreter model and analyzing explanation masks. It demonstrates:
-
-1. **Environment setup** - Setting required environment variables
-2. **Loading data** - Using the DataGen class to load test images
-3. **Loading models** - Loading pre-trained predictor and MaskInterpreter models
-4. **Generating masks** - Creating importance masks for test images
-5. **Mask analysis** - Calculating mask efficacy (PCC) and mask size metrics
-6. **Visualization** - Plotting original images, predictions, masks, and noisy predictions
-
-### Running the Example
-
-Before running the notebook, ensure you have:
-- Set the environment variables (`REPO_LOCAL_PATH`, `DATA_PATH`, `MODELS_PATH`)
-- Downloaded the example data or have your own dataset prepared
-- Pre-trained models available in the `MODELS_PATH` directory
-
-Open the notebook:
-```bash
-jupyter notebook example.ipynb
-```
-
-Or use VS Code's built-in Jupyter support to run the cells interactively.
-
-The notebook will guide you through the complete analysis pipeline and generate visualizations showing how MaskInterpreter identifies important regions in your images.
+## 5. [Quick Start](quickstart.md)
 
 ## Full Data Download
 
@@ -425,7 +455,7 @@ plt.show()
 ### Evaluating Mask Efficacy
 
 ```python
-from metrics import tf_pearson_corr
+from utils.metrics import tf_pearson_corr
 
 # Original prediction
 pred_orig = predictor(image[np.newaxis, ...])
@@ -528,6 +558,8 @@ python 4_calculate_explanation_mask_efficacy.py
 
 **Note**: Some scripts may have dependencies on outputs from previous scripts. Run them in the order listed above to ensure all required intermediate files are generated.
 
+## PyTorch Implementation
+> **PyTorch Implementation and implementation of supervised confidence model**: For a PyTorch version of MaskInterpreter and tools for assessing the supervised prediction quality at inference time using MaskInterpreter, see the companion repository: [https://github.com/zaritskylab/Interpretability](https://github.com/zaritskylab/Interpretability)
 
 ## Citation
 
@@ -542,16 +574,11 @@ If you use MaskInterpreter in your research, please cite:
 }
 ```
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Acknowledgments
 
-- Allen Institute for Cell Science for the cell imaging datasets
+- [Allen Institute for Cell Science](https://alleninstitute.org/cell-science) for the cell imaging datasets and review of the paper.
 
 ## Contact
 
-- **Author**: Lion Ben Nedava, Gad Miller
-- **Email**: lionben89@gmail.com, gadmicha@post.bgu.ac.il
+- **Email**: assafzar@gmail.com , lionben89@gmail.com, gadmicha@post.bgu.ac.il
 - **Lab**: [Zaritsky Lab](https://www.https://www.assafzaritsky.com/)

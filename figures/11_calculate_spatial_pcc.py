@@ -4,13 +4,12 @@ import os
 # Add parent directory to path to import cell_generator modules
 # sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import init_env_vars
 import tensorflow as tf
 import tensorflow.keras as keras
-from metrics import *
+from utils.metrics import *
 from cell_imaging_utils.image.image_utils import ImageUtils
 import global_vars as gv
-from utils import *
+from utils.utils import *
 import cv2
 from dataset import DataGen
 import matplotlib.pyplot as plt
@@ -236,10 +235,10 @@ def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,mo
 for param in params:
     try:
         print(param["model"])
-        base_path = os.path.join(os.environ['DATA_PATH'], "spatial_pcc/{}".format(param["model"].split('/')[-1]))
+        base_path = os.path.join(gv.DATA_PATH, "spatial_pcc/{}".format(param["model"].split('/')[-1]))
         create_dir_if_not_exist(base_path)
         # ds_path = "{}/merged_dataset.csv".format(base_path)
-        ds_path = os.path.join(os.environ['DATA_PATH'], f'{param["organelle"]}/image_list_test.csv')
+        ds_path = os.path.join(gv.DATA_PATH, f'{param["organelle"]}/image_list_test.csv')
         dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False,image_path_col='path_tiff')
         print("# images in dataset:",dataset.df.data.shape[0])  
         predict_images_and_calculate_spatial_pcc(dataset,model_path=param["model"],images=[1],weighted_pcc=False,noise_scale=param["noise"])            
