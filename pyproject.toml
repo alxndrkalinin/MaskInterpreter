@@ -29,6 +29,5 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["create_data", "figures", "gui", "models"]
 py-modules = ["dataset", "global_vars", "mg_analyzer", "test", "train"]
 packages = ["utils", "models", "gui", "figures", "create_data"]
