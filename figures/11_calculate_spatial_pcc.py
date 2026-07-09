@@ -57,12 +57,12 @@ def calculate_spatial_pcc(image1,image2):
     # Compute the Pearson correlation coefficient matrix for each slice of the 3D images
     corr_matrix = np.zeros((image1.shape[0], image1.shape[1], image1.shape[2]))
     occur_matrix = np.zeros((image1.shape[0], image1.shape[1], image1.shape[2]))
-    for z in range(0,image1.shape[0]- z_step,z_step):
-        for i in range(0,image1.shape[1]- xy_step,xy_step):
-            for j in range(0,image1.shape[2] - xy_step,xy_step):
-                # corr_matrix[z:z+z_step,i:i+xy_step, j:j+xy_step] += np.corrcoef(image1[z:z+z_step,i:i+xy_step, j:j+xy_step].flatten(), image2[z:z+z_step,i:i+xy_step, j:j+xy_step].flatten())[0, 1]
-                corr_matrix[z:z+z_step,i:i+xy_step, j:j+xy_step] +=tf_pearson_corr(image1[z:z+z_step,i:i+xy_step, j:j+xy_step], image2[z:z+z_step,i:i+xy_step, j:j+xy_step])[0, 1]
-                occur_matrix[z:z+z_step,i:i+xy_step, j:j+xy_step] +=1.0
+    for z in range(0,image1.shape[0]):
+        for i in range(0,image1.shape[1]- xy_step,16):
+            for j in range(0,image1.shape[2] - xy_step,16):
+                corr_matrix[z,i:i+xy_step, j:j+xy_step] += np.corrcoef(image1[z,i:i+xy_step, j:j+xy_step].flatten(), image2[z,i:i+xy_step, j:j+xy_step].flatten())[0, 1]
+                # corr_matrix[z,i:i+xy_step, j:j+xy_step] +=tf_pearson_corr(image1[z,i:i+xy_step, j:j+xy_step], image2[z,i:i+xy_step, j:j+xy_step])[0, 1]
+                occur_matrix[z,i:i+xy_step, j:j+xy_step] +=1.0
     return (corr_matrix).astype(np.float16), occur_matrix.astype(np.float16)           
 
 def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,model=None,images=range(10),weighted_pcc=False,noise_scale=1.5):
@@ -154,7 +154,7 @@ def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,mo
         del mask_noise_patchs
         
         prediction_to_gt_spatial_pcc, occur_matrix = calculate_spatial_pcc(target_image,unet_p/d)
-        prediction_to_gt_spatial_pcc = np.expand_dims(prediction_to_gt_spatial_pcc/d, axis=-1)
+        prediction_to_gt_spatial_pcc = np.expand_dims(prediction_to_gt_spatial_pcc/occur_matrix, axis=-1)
         ImageUtils.imsave(prediction_to_gt_spatial_pcc,"{}/prediction_to_gt_spatial_pcc_{}.tiff".format(dir_path,image_index))
         
         # Create overlay image: prediction with spatial PCC heatmap
@@ -163,7 +163,7 @@ def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,mo
         pcc_for_overlay = prediction_to_gt_spatial_pcc[:,:,:,0]
         # pcc_normalized = np.where(1-np.abs(pcc_for_overlay)<th,1-np.abs(pcc_for_overlay),0.0)#
         # pcc_normalized = 1 - np.clip(pcc_for_overlay, 0, 1)  # move range [-1,1] to [0,1]
-        pcc_normalized = pcc_for_overlay
+        pcc_normalized = 1 - pcc_for_overlay
         
         # Create overlay for each z-slice
         overlay_volume = []
@@ -200,7 +200,7 @@ def predict_images_and_calculate_spatial_pcc(dataset,model_path=gv.model_path,mo
         ax.axis('off')
         
         # Create colorbar using actual PCC values from prediction_to_gt_spatial_pcc
-        norm = mcolors.Normalize(vmin=pcc_normalized.min(), vmax=pcc_normalized.max())
+        norm = mcolors.Normalize(vmin=0, vmax=1)
         sm = cm.ScalarMappable(cmap=red_cmap, norm=norm)
         sm.set_array([])
         
@@ -241,7 +241,7 @@ for param in params:
         ds_path = os.path.join(gv.DATA_PATH, f'{param["organelle"]}/image_list_test.csv')
         dataset = DataGen(ds_path ,gv.input,gv.target,batch_size = 1, num_batches = 1, patch_size=gv.patch_size,min_precentage=0.0,max_precentage=1.0, augment=False,image_path_col='path_tiff')
         print("# images in dataset:",dataset.df.data.shape[0])  
-        predict_images_and_calculate_spatial_pcc(dataset,model_path=param["model"],images=[1],weighted_pcc=False,noise_scale=param["noise"])            
+        predict_images_and_calculate_spatial_pcc(dataset,model_path=param["model"],images=[0,1],weighted_pcc=False,noise_scale=param["noise"])            
     except Exception as e:
         print(e)
 
