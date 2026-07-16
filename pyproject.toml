@@ -3,31 +3,52 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cell_generator"
-version = "1.0.0"
-description = "Cell generator and mask interpreter for interpretable cell image analysis"
+name = "mask_interpreter"
+version = "2.0.0"
+description = "PyTorch MaskInterpreter: self-supervised importance masks for interpreting frozen predictors (image2image, classification, regression)"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
-    "tensorflow-addons>=0.20.0",
-    "numpy==1.20.3",
+    "torch>=2.1",
+    "torchvision>=0.16",
+    "numpy>=1.23",
     "pandas>=1.5.3",
     "scipy>=1.10.0",
     "scikit-learn>=1.0.0",
-    "scikit-image>=0.16.2",
+    "scikit-image>=0.19",
     "matplotlib",
-    "seaborn>=0.12.0",
-    "opencv-python==4.8.0.74",
-    "imageio",
-    "patchify>=0.1.9",
-    "tqdm>=4.60.0",
-    "h5py>=3.0.0",
-    "quilt3>=1.0.0",
-    "cell-imaging-utils>=1.17.1",
+    "tifffile>=2023.1.0",
     "imagecodecs",
-    "matplotlib-scalebar"
+    "tqdm>=4.60.0",
+    "pyyaml>=6.0",
+    # canonical Pearson-correlation implementation (github.com/alxndrkalinin/cubic).
+    "cubic>=0.7",
 ]
 
+# The retained, un-ported TF-era scripts (figures/, gui/, dataset.py, mg_analyzer.py,
+# utils/, models/) pull these in. The core PyTorch package does not need them.
+# `tensorflow*` and `cell-imaging-utils` are intentionally dropped (replaced by
+# tifffile + pandas); the old numpy==1.20.3 pin is removed (incompatible with modern torch).
+[project.optional-dependencies]
+legacy = [
+    "seaborn>=0.12.0",
+    "imageio",
+    "patchify>=0.1.9",
+    "quilt3>=1.0.0",
+    "opencv-python>=4.8",
+    "h5py>=3.0.0",
+    "matplotlib-scalebar",
+]
+dev = ["pytest>=7.0"]
+
 [tool.setuptools]
-py-modules = ["dataset", "global_vars", "mg_analyzer", "test", "train"]
-packages = ["utils", "models", "gui", "figures", "create_data"]
+# New PyTorch package (source of truth). Legacy TF modules are retained on disk for
+# reference but are no longer packaged; port or remove them before shipping.
+packages = [
+    "mask_interpreter",
+    "mask_interpreter.interpreter",
+    "mask_interpreter.data",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

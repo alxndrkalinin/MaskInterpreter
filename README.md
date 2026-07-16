@@ -33,6 +33,87 @@ Deep learning models often operate as "black boxes," making it difficult to unde
 - **Model-agnostic** - Works with any differentiable predictor (e.g. classifiers, regressors, image-to-image models)
 - **New measurement to quantify explanations** - the Pearson correlation coefficient (PCC) between the predictions derived from the unperturbed input, and the predictions derived from the importance mask-induced noisy inputs
 
+## 2b. PyTorch port (`mask_interpreter/`)
+
+The method has been ported to **PyTorch** in the `mask_interpreter/` package (NCHW/NCDHW,
+float32). It is **model-agnostic**: you bring your own frozen `nn.Module` predictor — no
+TF weights or `cell_imaging_utils` needed. The original TensorFlow modules (`models/`,
+`dataset.py`, `mg_analyzer.py`, `utils/`, `gui/`, `figures/`) are **retained on disk for
+reference** and are not required by the PyTorch package.
+
+### Install
+
+```bash
+uv venv --python 3.11 .venv && source .venv/bin/activate
+uv pip install -e .            # torch stack from pyproject.toml
+python -m pytest tests/        # 41 integration tests
+```
+
+### The three variants
+
+| variant | class | predictor output | front-end | PCC clamp |
+|---|---|---|---|---|
+| image-to-image (2D/3D) | `Image2ImageInterpreter` | image | 2× learned conv on input & prediction | one-sided (stops at target) |
+| classification (2D) | `ClassificationInterpreter` | class scores | 1× learned Conv2d on grad-augmented input | two-sided |
+| regression (2D) | `RegressionInterpreter` | scalar(s) | none (adaptor on grad-augmented input) | two-sided |
+
+The mask is a sigmoid U-Net (`unet.UNet`, dynamic depth driven by the first spatial
+axis). The adapted image is `mask*x + noise*(1-mask)`; the loss is
+`w_sim*MSE + w_mask*size + w_pcc*pcc`. Per-variant seed hyperparameters live in
+`config.py` (`IMAGE2IMAGE_LOSS`, `CLASSIFICATION_LOSS`, `REGRESSION_LOSS`).
+
+### Train (image-to-image)
+
+```python
+import torch
+from mask_interpreter import Image2ImageInterpreter, freeze
+from mask_interpreter.train import Trainer
+
+predictor = freeze(my_pretrained_unet)                 # any nn.Module: x -> prediction
+model = Image2ImageInterpreter(predictor, spatial_size=(32, 128, 128), ndim=3)
+
+trainer = Trainer(model, lr=1e-4, checkpoint_path="mg.pt",
+                  monitor="val_stop", term="val_pcc", term_value=0.03)
+trainer.fit(train_loader, val_loader, epochs=100)      # batches yield (x[, seg])
+
+model.eval()
+with torch.no_grad():
+    mask = model(x)                                    # importance mask in [0, 1]
+```
+
+Classification/regression are analogous; their batches are `x` (or `(x, y)`), and the
+gradient-augmentation channel is computed internally.
+
+### Evaluate (FOV threshold sweep)
+
+```python
+from mask_interpreter.analyze import Analyzer
+
+az = Analyzer(model, "image_list.csv", input_col="channel_signal",
+              target_col="channel_dna", patch_size=(32, 128, 128, 1))
+az.calc_unet_pcc("out/", images=range(10))                    # predictor quality vs target
+az.find_noise_scale("out/", images=range(10))                 # noise-std selection
+az.analyze_th("out/", mode="agg", images=range(10), save_image=True)  # mask-size / context sweep
+```
+
+Outputs: `pcc_results.csv`, `mask_size_results.csv`, `context_results.csv`, and per-image
+tiffs (`input_/target_/unet_prediction_/mask_/noisy_*`). Noise is drawn **once per image**
+and reused across thresholds (a faithful, reproducible sweep).
+
+### What changed vs. the TF version
+
+- `cell_imaging_utils` I/O → `tifffile` + `pandas`; `keras.Model` custom `train_step` →
+  `nn.Module` + plain training loop; float64 → float32.
+- PCC is consistent with [`cubic`](https://github.com/alxndrkalinin/cubic): the numpy
+  eval path calls `cubic.metrics.pcc`; the training loss mirrors its math in a
+  differentiable torch form (`cubic.pcc` returns a float and detaches, so it can't carry
+  the loss gradient). NaN-on-zero-variance and `[-1,1]` clipping match cubic.
+- Silent failure modes removed: the analyzer no longer swallows errors into `-1`, and
+  `predict` raises a real error on CUDA OOM (after retrying at smaller batch sizes).
+- `global_vars.py` (mutated at import) → `config.py` dataclasses (`Config`, `*Loss`).
+
+See `PYTORCH_PORT_PLAN.md` for the full design and fidelity notes.
+
 ## 3. Repository Structure
 
 ```
