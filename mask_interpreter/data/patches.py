@@ -1,5 +1,5 @@
-"""Pure-numpy patch collect/assemble helpers (framework-agnostic; ported verbatim
-from ``utils/utils.py``). Triangular overlap weighting favours patch centres."""
+"""Pure-numpy patch collect/assemble helpers (framework-agnostic; adapted from
+``utils/utils.py``). Triangular overlap weighting favours patch centres."""
 
 from __future__ import annotations
 
@@ -8,16 +8,25 @@ import scipy.signal
 
 
 def get_weights(shape: tuple[int, ...]) -> np.ndarray:
-    shape_in = shape
-    shape = shape[1:]
-    weights = 1
-    for idx_d in range(len(shape)):
-        slicey = [np.newaxis] * len(shape)
+    """Triangular overlap weights over **every spatial axis** of one patch.
+
+    ``shape`` is a single patch's shape ``(*spatial, C)``. A triangular window is applied
+    to each spatial axis (favouring patch centres so overlapping patches feather smoothly)
+    and broadcast uniformly across the trailing channel axis.
+
+    NB: the TF original (and the first port) did ``shape = shape[1:]``, which — because the
+    call site passes a single patch, not a batch — dropped the leading spatial axis (Z),
+    leaving the ~50%-overlapping Z blend flat-averaged. Feathering Z as well is the intended
+    behaviour and changes assembled/PCC outputs vs. that version.
+    """
+    weights: np.ndarray | float = 1.0
+    ndim = len(shape)
+    for idx_d in range(ndim - 1):  # spatial axes only; trailing axis = channels (uniform)
+        slicey = [np.newaxis] * ndim
         slicey[idx_d] = slice(None)
-        size = shape[idx_d]
-        values = scipy.signal.windows.triang(size)
+        values = scipy.signal.windows.triang(shape[idx_d])
         weights = weights * values[tuple(slicey)]
-    return np.broadcast_to(weights, shape_in).astype(np.float32)
+    return np.broadcast_to(weights, shape).astype(np.float32)
 
 
 def slice_image(image_ndarray: np.ndarray, indexes: list) -> np.ndarray:
