@@ -51,3 +51,12 @@ def test_unet_sigmoid_range():
 def test_unet_out_channels():
     unet = UNet((32, 32, 3), out_channels=5, final_activation="linear")
     assert _out_spatial(unet, (2, 3, 32, 32)) == (2, 5, 32, 32)
+
+
+@pytest.mark.parametrize("s", [(20, 20), (40, 40), (7, 7), (31, 33), (30, 120, 120)])
+def test_unet_non_power_of_two_shapes(s):
+    # Floor-halving on the down path is not exactly reversed by x2 upsampling for these
+    # sizes; the up path must still emit one stage per skip and reconstruct input size.
+    unet = UNet((*s, 3), batch_norm=False, final_activation="sigmoid")
+    assert len(unet.up_sample) == len(unet.down_pre)
+    assert _out_spatial(unet, (1, 3, *s)) == (1, 1, *s)

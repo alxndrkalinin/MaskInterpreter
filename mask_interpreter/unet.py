@@ -7,8 +7,9 @@ Fidelity notes (§1.1 of the plan — this is the main architectural risk):
   **3 levels**, bottleneck ``(4,16,16)`` — not "halve every axis until <=4".
 - Skips are taken **before** the downsampling conv (TF order).
 - 'same' padding mapping: stride-1 k3 -> pad 1; strided k4/s2 -> pad 1 (halves even
-  dims); transposed k4/s2/pad1 -> exactly x2. For the used even/power-of-two patch
-  sizes down/up shapes match; a defensive center-crop guards odd-dim skips.
+  dims); transposed k4/s2/pad1 -> exactly x2. For power-of-two sizes down/up shapes
+  match exactly; for other sizes the up path emits one stage per skip and each stage is
+  center crop-or-padded to its skip (``_match_spatial_to``), so output == input size.
 - Final conv has **no** BatchNorm, only the configurable activation (sigmoid for the
   mask generator, linear/relu for an in-silico-labeling predictor).
 - The companion ``UNet3D`` is deliberately *not* used as the template (fixed depth,
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 _ACTIVATIONS = {
     "sigmoid": nn.Sigmoid,
@@ -38,15 +40,30 @@ def _make_activation(name: str | None) -> nn.Module:
     return _ACTIVATIONS[key]()
 
 
-def _center_crop_to(x: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
-    """Center-crop the spatial dims of ``x`` down to ``ref``'s (defensive, odd dims)."""
+def _match_spatial_to(x: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
+    """Center crop-or-pad the spatial dims of ``x`` to ``ref``'s.
+
+    Floor-halving on the down path (``d // 2``) is not exactly reversed by the up path's
+    ``x2`` transposed conv for non-power-of-two sizes, so an upsampled feature map may be
+    *smaller* as well as larger than its skip. Cropping alone (the old behaviour) then
+    left a size mismatch that crashed the concat; here we crop dims that overshoot and
+    zero-pad dims that undershoot. For the power-of-two sizes the ports use, shapes match
+    exactly and this is a no-op.
+    """
     if x.shape[2:] == ref.shape[2:]:
         return x
     slices = [slice(None), slice(None)]
     for xs, rs in zip(x.shape[2:], ref.shape[2:]):
         start = max((xs - rs) // 2, 0)
-        slices.append(slice(start, start + rs))
-    return x[tuple(slices)]
+        slices.append(slice(start, start + rs) if xs > rs else slice(None))
+    x = x[tuple(slices)]
+    if x.shape[2:] != ref.shape[2:]:
+        pad: list[int] = []
+        for xs, rs in zip(reversed(x.shape[2:]), reversed(ref.shape[2:])):  # F.pad: last dim first
+            total = max(rs - xs, 0)
+            pad.extend([total // 2, total - total // 2])
+        x = F.pad(x, pad)
+    return x
 
 
 class UNet(nn.Module):
@@ -119,11 +136,12 @@ class UNet(nn.Module):
 
         self.up_sample = nn.ModuleList()  # transposed upsample
         self.up_post = nn.ModuleList()    # after concat with skip
-        i = len(skip_channels) - 1
-        while layer_dim[0] < spatial[0]:
+        # One up stage per recorded skip (high resolution last) so the up-path level count
+        # always equals the down-path's — driving it off ``layer_dim[0] < spatial[0]`` with
+        # ``x2`` doubling mismatched the floor-halved down count for non-power-of-two sizes.
+        for i in range(len(skip_channels) - 1, -1, -1):
             f = filters
             self.up_sample.append(cbr(x_ch, f, 4, 2, transposed=True))
-            layer_dim = [d * 2 for d in layer_dim]
             concat_ch = f + skip_channels[i]
             self.up_post.append(
                 nn.Sequential(
@@ -133,7 +151,6 @@ class UNet(nn.Module):
             )
             x_ch = f
             filters = filters // 2
-            i -= 1
 
         final_conv = conv(x_ch, out_channels, kernel_size=3, stride=1, padding=1)
         self.final = nn.Sequential(final_conv, _make_activation(final_activation))
@@ -147,7 +164,7 @@ class UNet(nn.Module):
         x = self.bottleneck(x)
         for up, post, skip in zip(self.up_sample, self.up_post, reversed(skips)):
             x = up(x)
-            x = _center_crop_to(x, skip)
+            x = _match_spatial_to(x, skip)
             x = torch.cat([x, skip], dim=1)
             x = post(x)
         return self.final(x)

@@ -135,6 +135,16 @@ class Analyzer:
 
     # --- shared helpers -------------------------------------------------
 
+    def _resolve_images(self, images):
+        """Drop out-of-range FOV indices (the default ``range(10)`` overshoots small sets).
+
+        The TF original clamped ``analyze_th`` to ``range(len(df))``; here we filter to
+        in-bounds indices for all analyses so the default never runs ``df.iloc`` past the
+        end (which raised ``IndexError``).
+        """
+        n = len(self.df)
+        return [int(i) for i in images if 0 <= int(i) < n]
+
     def _preprocess(self, image_index: int, slice_by):
         return preprocess_image(
             self.df, image_index, self.columns, list(FOV_NORMALIZE),
@@ -180,6 +190,7 @@ class Analyzer:
     def calc_unet_pcc(self, out_dir, images=range(10), weighted_pcc=False):
         """PCC of the frozen predictor's assembled prediction against the target."""
         _create_dir(out_dir)
+        images = self._resolve_images(images)
         rows = []
         for image_index in images:
             imgs = self._preprocess(int(image_index), slice_by=None)
@@ -228,6 +239,7 @@ class Analyzer:
             raise ValueError(f"unknown mode {mode!r}")
 
         _create_dir(out_dir)
+        images = self._resolve_images(images)
         rng = np.random.default_rng(seed)
         pcc_rows, mask_rows, context_rows = [], [], []
 
@@ -314,6 +326,7 @@ class Analyzer:
     def find_noise_scale(self, out_dir, images=range(10), weighted_pcc=False,
                          noise_start=0.0, noise_stop=4.5, noise_step=0.5):
         _create_dir(out_dir)
+        images = self._resolve_images(images)
         noises = np.arange(noise_start, noise_stop, noise_step)
         rows = []
         for image_index in images:

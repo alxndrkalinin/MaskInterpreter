@@ -116,3 +116,12 @@ def test_find_noise_scale(tmp_path):
     result = az.find_noise_scale(str(tmp_path / "out"), images=[0])
     assert os.path.exists(tmp_path / "out" / "noise_pcc_results.csv")
     assert result.shape[1] == len(np.arange(0.0, 4.5, 0.5))
+
+
+def test_default_images_clamped_to_dataset_size(tmp_path):
+    # Default images=range(10) must not run df.iloc past the end of a small (1-FOV) set.
+    csv = _write_fov(tmp_path)
+    az = _analyzer(csv)
+    assert len(az.calc_unet_pcc(str(tmp_path / "u"))) == 1                 # default range(10)
+    assert az.find_noise_scale(str(tmp_path / "n")).shape[0] == 1
+    assert az.analyze_th(str(tmp_path / "a"), mode="regular")[0].shape[0] == 1

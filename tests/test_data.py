@@ -82,6 +82,16 @@ def test_fov_predictors_concat(tmp_path):
     assert x.shape == (2, 4, 8, 8)  # input + in-silico channel
 
 
+def test_fov_predictors_concat_z1(tmp_path):
+    # Z==1 FOV + predictor: reshape (not squeeze) must keep the singleton Z so the concat
+    # stays rank-consistent.
+    csv = _write_fov(tmp_path, Z=1)
+    ds = FOVPatchDataset(csv, "ch_in", "ch_tgt", patch_size=(1, 8, 8),
+                         predictors=torch.nn.Identity(), seed=0)
+    x, _ = ds[0]
+    assert x.shape == (2, 8, 8)  # (input + in-silico), Z dropped for 2D patch
+
+
 def test_fov_dilate_runs(tmp_path):
     csv = _write_fov(tmp_path)
     ds = FOVPatchDataset(csv, "ch_in", "ch_tgt", patch_size=(4, 8, 8), dilate=True, seed=0)

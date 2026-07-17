@@ -163,7 +163,9 @@ class FOVPatchDataset(Dataset):
         with torch.no_grad():
             x = torch.from_numpy(input_image[None, None]).float()
             pred = fn(x)
-        pred = pred.squeeze().cpu().numpy().astype(np.float32)
+        # Reshape (not squeeze) back to the input's spatial shape: squeeze() would also
+        # collapse a legitimate size-1 spatial axis (e.g. a Z==1 FOV), corrupting the concat.
+        pred = pred.detach().cpu().numpy().astype(np.float32).reshape(input_image.shape)
         if self.norm:
             pred = T.normalize(pred, self.norm_type)
         return pred
