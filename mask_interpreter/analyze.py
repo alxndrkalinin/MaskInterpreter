@@ -133,22 +133,26 @@ def preprocess_fov(fov, columns, normalize, min_z: int = 32, slice_by=None, is_2
     return images
 
 
-def _context_ratio(mask_binary: np.ndarray, seg: np.ndarray) -> tuple[float, float]:
+def _context_ratio(mask_binary: np.ndarray, seg: np.ndarray, has_seg: bool = True) -> tuple[float, float]:
     """Return ``(mask_size_fraction, context_ratio)``.
 
     An **empty mask** (all-zero at this threshold) is a legitimate threshold-sweep tail
-    outcome: report ``(0.0, NaN)`` rather than crashing. A **non-empty mask with zero
-    organelle intersection** means the organelle segmentation is absent/misaligned — a
-    genuine data problem — so raise (replaces the TF broad-except -> ``-1`` sentinel).
+    outcome: report ``(0.0, NaN)``. When **no organelle segmentation was provided**
+    (``has_seg=False``) the context ratio is undefined, so report ``(mask_size, NaN)``. A
+    **non-empty mask with a provided-but-zero-intersection seg** means the segmentation is
+    misaligned/empty — a genuine data problem — so raise (replaces the TF broad-except
+    -> ``-1`` sentinel).
     """
     mask_size_raw = np.sum(mask_binary, dtype=np.float64)
     if mask_size_raw == 0:
         return 0.0, float("nan")
+    mask_size = mask_size_raw / np.prod(mask_binary.shape)
+    if not has_seg:
+        return float(mask_size), float("nan")
     intersection = np.sum(mask_binary * seg, dtype=np.float64)
     if intersection == 0:
         raise ValueError("zero mask-organelle intersection: cannot compute context ratio")
     mask_organelle_intersection = intersection / mask_size_raw
-    mask_size = mask_size_raw / np.prod(mask_binary.shape)
     context = 1.0 / (mask_organelle_intersection / mask_size)
     return float(mask_size), float(context)
 
@@ -339,6 +343,7 @@ class Analyzer:
             imgs = self._preprocess(image_index, slice_by)
             input_image, target_image, target_seg = imgs[0], imgs[1], imgs[2]
             nuc_image, mem_image, mem_seg = imgs[3], imgs[4], imgs[5]
+            has_seg = target_seg is not None  # no organelle seg -> context ratio is undefined (NaN)
             target_seg = np.zeros_like(target_image) if target_seg is None else target_seg / 255.0
 
             pz_end = input_image.shape[0]
@@ -364,7 +369,7 @@ class Analyzer:
             pccs, mask_sizes, contexts = [], [], []
             for th in ths:
                 mask_p, mask_p_binary = self._threshold(mode, th, ths_step, mask_p_full, d, mask_image)
-                mask_size, context = _context_ratio(mask_p_binary, target_seg)
+                mask_size, context = _context_ratio(mask_p_binary, target_seg, has_seg)
 
                 mask_patchs_term = collect_patchs(0, 0, 0, px_end, py_end, pz_end, mask_p,
                                                   self.patch_size, self.xy_step, self.z_step)

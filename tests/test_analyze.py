@@ -95,10 +95,29 @@ def test_analyze_th_seed_determinism(tmp_path):
 
 
 def test_zero_intersection_raises(tmp_path):
-    csv = _write_fov(tmp_path, seg_full=False)  # empty structure_seg
+    csv = _write_fov(tmp_path, seg_full=False)  # empty structure_seg (present but zero)
     az = _analyzer(csv)
     with pytest.raises(ValueError, match="intersection"):
         az.analyze_th(str(tmp_path / "out"), mode="regular", images=[0])
+
+
+def test_analyze_th_without_seg_gives_nan_context(tmp_path):
+    # No structure_seg channel at all: context is undefined (NaN), and analyze_th must NOT
+    # raise (unlike a provided-but-empty seg, which still raises above).
+    rng = np.random.default_rng(0)
+    fov = {"input": rng.standard_normal((Z, Y, X)).astype(np.float32),
+           "target": rng.standard_normal((Z, Y, X)).astype(np.float32)}
+    torch.manual_seed(0)
+    interp = Image2ImageInterpreter(RegionImagePredictor((4, 8, 8)), spatial_size=(4, 8, 8),
+                                    ndim=3, in_channels=1, pred_channels=1,
+                                    loss=LossConfig(pcc_target=0.9))
+    az = _in_memory_analyzer(interp, [fov])
+    pcc_df, mask_df, ctx_df = az.analyze_th(str(tmp_path / "out"), mode="agg", images=[0], seed=0)
+    assert np.isnan(ctx_df.to_numpy()).all()          # context undefined without seg
+    assert not np.isnan(mask_df.to_numpy()).all()     # mask size still computed
+    pv = pcc_df.to_numpy().ravel()
+    pv = pv[~np.isnan(pv)]
+    assert np.all(pv >= -1.0001) and np.all(pv <= 1.0001)
 
 
 def test_calc_unet_pcc(tmp_path):
