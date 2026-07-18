@@ -56,9 +56,9 @@ def dilate_zyx(image: np.ndarray, kernel: int = 25) -> np.ndarray:
 class FOVPatchDataset(Dataset):
     def __init__(
         self,
-        image_list_csv: str,
-        input_col: str,
-        target_col: str,
+        image_list_csv: str | None = None,
+        input_col: str | int = "input",
+        target_col: str | int = "target",
         patch_size: tuple[int, ...] = (32, 128, 128),
         image_path_col: str = "path_tiff",
         min_percentage: float = 0.0,
@@ -73,8 +73,16 @@ class FOVPatchDataset(Dataset):
         predictors=None,
         channel_axis: int = 0,
         seed: int | None = None,
+        images=None,
         **unsupported,
     ) -> None:
+        """FOV patches from a CSV/tiff list (``image_list_csv``) **or** in-memory FOVs (``images``).
+
+        Provide exactly one source. ``images`` is a sequence of FOVs, each a channel-first
+        ``(C, Z, Y, X)`` array/tensor (``input_col``/``target_col`` are integer channel indices)
+        or a role→volume ``dict`` (``input_col``/``target_col`` are its keys). Channels are
+        ``(Z, Y, X)`` (or ``(Y, X)`` when ``patch_size[0]==1``).
+        """
         for key in unsupported:
             if key in _UNSUPPORTED:
                 raise NotImplementedError(
@@ -82,8 +90,11 @@ class FOVPatchDataset(Dataset):
                 )
             raise TypeError(f"unexpected argument {key!r}")
 
-        self.df = pd.read_csv(image_list_csv)
-        self.n = len(self.df)
+        if (image_list_csv is None) == (images is None):
+            raise ValueError("provide exactly one of `image_list_csv` or `images` (in-memory FOVs)")
+        self._images = list(images) if images is not None else None
+        self.df = pd.read_csv(image_list_csv) if image_list_csv is not None else None
+        self.n = len(self._images) if self._images is not None else len(self.df)
         self.input_col = input_col
         self.target_col = target_col
         self.image_path_col = image_path_col
@@ -110,26 +121,48 @@ class FOVPatchDataset(Dataset):
             return np.random.default_rng()
         return np.random.default_rng(self.seed * 10_000_019 + index)
 
-    def _load_channel(self, arr: np.ndarray, col: str) -> np.ndarray:
-        idx = int(self.df.iloc[self._cur_image][col])
-        return get_channel(arr, idx)
+    def _coerce_volume(self, a) -> np.ndarray:
+        """Coerce an in-memory channel to a float32 ``(Z, Y, X)`` volume (2D -> Z=1)."""
+        if torch.is_tensor(a):
+            a = a.detach().cpu().numpy()
+        a = np.asarray(a).astype(np.float32)
+        if self.is_2d and a.ndim == 2:
+            a = a[None]  # (Y, X) -> (1, Y, X)
+        if a.ndim != 3:
+            want = "(Z, Y, X) or (Y, X)" if self.is_2d else "(Z, Y, X)"
+            raise ValueError(f"FOV channel must be {want}; got shape {a.shape}")
+        return a
+
+    def _load_channels(self, image_index: int) -> tuple[np.ndarray, np.ndarray]:
+        """Return the raw ``(Z, Y, X)`` input and target channels for one FOV."""
+        if self._images is not None:
+            fov = self._images[image_index]
+            if torch.is_tensor(fov):
+                fov = fov.detach().cpu().numpy()
+            if isinstance(fov, dict):
+                inp, tgt = fov[self.input_col], fov[self.target_col]
+            else:
+                arr = np.asarray(fov)
+                inp, tgt = arr[int(self.input_col)], arr[int(self.target_col)]
+            return self._coerce_volume(inp), self._coerce_volume(tgt)
+        path = self.df.iloc[image_index][self.image_path_col]
+        arr = read_tiff(path, self.channel_axis).astype(np.float32)
+        return (get_channel(arr, int(self.df.iloc[image_index][self.input_col])),
+                get_channel(arr, int(self.df.iloc[image_index][self.target_col])))
 
     def __getitem__(self, index: int):
         rng = self._rng(index)
         image_index = int(rng.integers(self.min_idx, self.max_idx))
-        self._cur_image = image_index
-        path = self.df.iloc[image_index][self.image_path_col]
-        arr = read_tiff(path, self.channel_axis).astype(np.float32)
+        input_image, target_image = self._load_channels(image_index)  # (Z, Y, X) each
 
         k = int(rng.integers(0, 4)) if self.augment else 0
-        if k:
-            arr = T.rot90(arr, k=k, axes=(arr.ndim - 2, arr.ndim - 1))
+        if k:  # rotate the last two (Y, X) axes — per-channel, identical to rotating the FOV
+            input_image = T.rot90(input_image, k=k, axes=(input_image.ndim - 2, input_image.ndim - 1))
+            target_image = T.rot90(target_image, k=k, axes=(target_image.ndim - 2, target_image.ndim - 1))
 
-        input_image = self._load_channel(arr, self.input_col)  # (Z, Y, X)
         if self.norm:
             input_image = T.normalize(input_image, self.norm_type)
 
-        target_image = self._load_channel(arr, self.target_col)
         if self.dilate:
             target_image = dilate_zyx(target_image, self.dilate_kernel)
         elif self.norm:

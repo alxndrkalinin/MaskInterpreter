@@ -113,6 +113,39 @@ def test_fov_seed_determinism(tmp_path):
     assert torch.equal(x1, x2)
 
 
+def test_fov_in_memory_matches_csv(tmp_path):
+    # In-memory FOVs (channel-first array and role dict) reproduce the CSV/tiff path exactly.
+    csv = _write_fov(tmp_path)
+    arr = np.asarray(tifffile.imread(pd.read_csv(csv)["path_tiff"].iloc[0])).astype(np.float32)
+    ds_csv = FOVPatchDataset(csv, "ch_in", "ch_tgt", patch_size=(4, 8, 8), seed=7, augment=True)
+    ds_arr = FOVPatchDataset(images=[arr], input_col=0, target_col=1,
+                             patch_size=(4, 8, 8), seed=7, augment=True)
+    ds_dict = FOVPatchDataset(images=[{"ch_in": arr[0], "ch_tgt": arr[1]}],
+                              input_col="ch_in", target_col="ch_tgt",
+                              patch_size=(4, 8, 8), seed=7, augment=True)
+    for i in range(5):
+        assert torch.equal(ds_csv[i][0], ds_arr[i][0]) and torch.equal(ds_csv[i][1], ds_arr[i][1])
+        assert torch.equal(ds_csv[i][0], ds_dict[i][0]) and torch.equal(ds_csv[i][1], ds_dict[i][1])
+
+
+def test_fov_in_memory_requires_exactly_one_source(tmp_path):
+    csv = _write_fov(tmp_path)
+    with pytest.raises(ValueError, match="exactly one"):
+        FOVPatchDataset()                                   # neither
+    with pytest.raises(ValueError, match="exactly one"):
+        FOVPatchDataset(csv, images=[np.zeros((2, 4, 8, 8), np.float32)])  # both
+
+
+def test_fov_in_memory_2d(tmp_path):
+    # 2D patch (patch_size[0]==1) from in-memory (Y, X) channels lifted to Z=1.
+    fov = {"sig": np.random.default_rng(0).standard_normal((16, 16)).astype(np.float32),
+           "tgt": np.random.default_rng(1).standard_normal((16, 16)).astype(np.float32)}
+    ds = FOVPatchDataset(images=[fov], input_col="sig", target_col="tgt",
+                         patch_size=(1, 8, 8), seed=0)
+    x, y = ds[0]
+    assert x.shape == (1, 8, 8) and y.shape == (1, 8, 8)
+
+
 def _write_single_cell(tmp_path, Z=20, Y=16, X=16):
     sig = np.random.default_rng(2).standard_normal((Z, Y, X)).astype(np.float32)
     tgt = np.random.default_rng(3).standard_normal((Z, Y, X)).astype(np.float32)
