@@ -162,6 +162,45 @@ def test_in_memory_missing_optional_channel(tmp_path):
     assert math.isfinite(float(r["PCC"].iloc[0]))
 
 
+def test_analyze_2d_fov(tmp_path):
+    # 2D FOV (patch_size[0]==1) with a 2D interpreter: dict/array/CSV paths agree, tiffs are
+    # saved as degenerate (1, Y, X, 1) volumes, and results are finite.
+    torch.manual_seed(0)
+    interp = Image2ImageInterpreter(RegionImagePredictor((Y, X)), spatial_size=(Y, X),
+                                    ndim=2, in_channels=1, pred_channels=1,
+                                    loss=LossConfig(pcc_target=0.9))
+    rng = np.random.default_rng(0)
+    sig = rng.standard_normal((Y, X)).astype(np.float32)
+    reg = np.zeros((Y, X), np.float32)
+    reg[Y // 4:Y - Y // 4, X // 4:X - X // 4] = 1.0
+    chans = [sig, sig * reg, reg * 255.0, rng.standard_normal((Y, X)).astype(np.float32),
+             rng.standard_normal((Y, X)).astype(np.float32),
+             255.0 * (rng.standard_normal((Y, X)) > 0)]
+    fov_dict = dict(zip(["input", "target", "structure_seg", "channel_dna",
+                         "channel_membrane", "membrane_seg"], chans))
+    fov_arr = np.stack(chans).astype(np.float32)   # (6, Y, X)
+
+    def az(source):
+        return Analyzer(interp, patch_size=(1, Y, X, 1), xy_step=8, z_step=1,
+                        batch_size=2, device=DEVICE, **source)
+
+    p_dict = az({"images": [fov_dict]}).analyze_th(str(tmp_path / "d"), mode="agg",
+                                                   images=[0], seed=0)[0]
+    p_arr = az({"images": [fov_arr]}).analyze_th(str(tmp_path / "a"), mode="agg",
+                                                 images=[0], seed=0)[0]
+    np.testing.assert_allclose(p_dict.to_numpy(), p_arr.to_numpy(), equal_nan=True)
+
+    vals = p_dict.to_numpy().ravel()
+    vals = vals[~np.isnan(vals)]
+    assert np.all(vals >= -1.0001) and np.all(vals <= 1.0001)
+    assert math.isfinite(float(az({"images": [fov_dict]}).calc_unet_pcc(
+        str(tmp_path / "u"), images=[0])["PCC"].iloc[0]))
+
+    az({"images": [fov_dict]}).analyze_th(str(tmp_path / "s"), mode="regular",
+                                          images=[0], save_image=True)
+    assert np.asarray(tifffile.imread(tmp_path / "s" / "0" / "full" / "mask_0.tiff")).shape == (1, Y, X, 1)
+
+
 def test_analyzer_requires_exactly_one_source():
     with pytest.raises(ValueError, match="exactly one"):
         Analyzer(None)  # neither data nor images

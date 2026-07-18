@@ -52,12 +52,14 @@ def preprocess_image(
     min_z: int = 32,
     slice_by=None,
     channel_axis: int = 0,
+    is_2d: bool = False,
 ):
     """Load selected channels of a FOV tiff → list of ``(Z, Y, X, 1)`` arrays (or None).
 
     Reproduces ``utils.preprocess_image``: per-channel std-normalize, optional spatial
     crop (``slice_by``), and the ``Z<min_z`` edge-pad with ``ceil((min_z-Z)/2)`` both
-    sides. A missing/NaN channel column yields ``None``.
+    sides. A missing/NaN channel column yields ``None``. With ``is_2d`` a channel stored as
+    ``(Y, X)`` is lifted to ``(1, Y, X, 1)``.
     """
     row = df.iloc[image_index]
     arr = read_tiff(row[path_col], channel_axis).astype(np.float32)
@@ -67,8 +69,7 @@ def preprocess_image(
         if ch is None or (isinstance(ch, float) and math.isnan(ch)):
             images.append(None)
             continue
-        image = arr[int(ch)]  # (Z, Y, X)
-        image = np.expand_dims(image, axis=-1)  # (Z, Y, X, 1)
+        image = _as_zyx1(arr[int(ch)], is_2d)  # (Z, Y, X, 1)
         if normalize is True or normalize[i]:
             image = normalize_std(image)
         if slice_by is not None:
@@ -79,19 +80,26 @@ def preprocess_image(
     return images
 
 
-def _as_zyx1(a) -> np.ndarray:
-    """Coerce a channel array/tensor to float32 ``(Z, Y, X, 1)``."""
+def _as_zyx1(a, is_2d: bool = False) -> np.ndarray:
+    """Coerce a channel array/tensor to float32 ``(Z, Y, X, 1)``.
+
+    In 2D mode a ``(Y, X)`` channel is lifted to a degenerate ``(1, Y, X, 1)`` volume, so the
+    rest of the (3D) pipeline treats 2D as a single Z-slice.
+    """
     if torch.is_tensor(a):
         a = a.detach().cpu().numpy()
     a = np.asarray(a).astype(np.float32)
     if a.ndim == 4 and a.shape[-1] == 1:
-        a = a[..., 0]
+        a = a[..., 0]           # (Z, Y, X, 1) -> (Z, Y, X)
+    if is_2d and a.ndim == 2:
+        a = a[None]             # (Y, X) -> (1, Y, X)
     if a.ndim != 3:
-        raise ValueError(f"FOV channel must be (Z, Y, X) or (Z, Y, X, 1); got shape {a.shape}")
+        want = "(Y, X)" if is_2d else "(Z, Y, X) or (Z, Y, X, 1)"
+        raise ValueError(f"FOV channel must be {want}; got shape {a.shape}")
     return a[..., None]
 
 
-def preprocess_fov(fov, columns, normalize, min_z: int = 32, slice_by=None):
+def preprocess_fov(fov, columns, normalize, min_z: int = 32, slice_by=None, is_2d: bool = False):
     """In-memory analogue of ``preprocess_image`` → list of ``(Z, Y, X, 1)`` arrays (or None).
 
     Applies the *same* per-channel std-normalize / crop / Z-pad as the tiff path, but reads
@@ -102,7 +110,7 @@ def preprocess_fov(fov, columns, normalize, min_z: int = 32, slice_by=None):
       absent roles yield ``None``; or
     - a channel-first ``(C, Z, Y, X)`` array/tensor whose channels are taken in ``columns``
       order (``[input, target, structure_seg, channel_dna, channel_membrane, membrane_seg]``);
-      channels beyond ``C`` yield ``None``.
+      channels beyond ``C`` yield ``None``. With ``is_2d`` each channel may be ``(Y, X)``.
     """
     if torch.is_tensor(fov):
         fov = fov.detach().cpu().numpy()
@@ -114,7 +122,7 @@ def preprocess_fov(fov, columns, normalize, min_z: int = 32, slice_by=None):
         if ch is None:
             images.append(None)
             continue
-        image = _as_zyx1(ch)
+        image = _as_zyx1(ch, is_2d)
         if normalize is True or normalize[i]:
             image = normalize_std(image)
         if slice_by is not None:
@@ -184,6 +192,7 @@ class Analyzer:
         self.input_col = input_col
         self.target_col = target_col
         self.patch_size = tuple(int(p) for p in patch_size)
+        self.is_2d = self.patch_size[0] == 1  # (1, Y, X, 1) marks a 2D FOV
         self.xy_step = xy_step
         self.z_step = z_step
         self.batch_size = batch_size
@@ -207,20 +216,28 @@ class Analyzer:
         if self._images is not None:
             return preprocess_fov(
                 self._images[image_index], self.columns, list(FOV_NORMALIZE),
-                min_z=self.patch_size[0], slice_by=slice_by,
+                min_z=self.patch_size[0], slice_by=slice_by, is_2d=self.is_2d,
             )
         return preprocess_image(
             self.df, image_index, self.columns, list(FOV_NORMALIZE),
             path_col=self.path_col, min_z=self.patch_size[0], slice_by=slice_by,
-            channel_axis=self.channel_axis,
+            channel_axis=self.channel_axis, is_2d=self.is_2d,
         )
 
     def predict(self, model: torch.nn.Module, data: np.ndarray) -> np.ndarray:
-        """Batched inference on ``(N, *spatial, C)`` numpy -> ``(N, *spatial, Cout)`` numpy."""
+        """Batched inference on ``(N, *spatial, C)`` numpy -> ``(N, *spatial, Cout)`` numpy.
+
+        In 2D mode the singleton Z axis is dropped before the (2D) model and restored after,
+        so patches stay ``(N, 1, Y, X, C)`` for the surrounding 3D assembly machinery while
+        the model sees ``(N, C, Y, X)``.
+        """
         n = data.shape[0]
         t = torch.from_numpy(np.ascontiguousarray(data)).float()
         perm = [0, t.ndim - 1] + list(range(1, t.ndim - 1))
         t = t.permute(*perm).contiguous()  # (N, C, *spatial)
+        squeeze_z = self.is_2d and t.ndim == 5  # (N, C, 1, Y, X) -> (N, C, Y, X)
+        if squeeze_z:
+            t = t[:, :, 0]
         bs = self.batch_size
         while True:
             try:
@@ -236,6 +253,8 @@ class Analyzer:
                 if bs <= 1:
                     raise RuntimeError("predict failed: CUDA OOM even at batch_size=1")
                 bs = max(1, bs // 2)
+        if squeeze_z:
+            out = out.unsqueeze(2)  # (N, Cout, Y, X) -> (N, Cout, 1, Y, X)
         inv = [0] + list(range(2, out.ndim)) + [1]
         return out.permute(*inv).contiguous().numpy()
 
