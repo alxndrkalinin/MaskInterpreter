@@ -118,6 +118,57 @@ def test_find_noise_scale(tmp_path):
     assert result.shape[1] == len(np.arange(0.0, 4.5, 0.5))
 
 
+def _in_memory_analyzer(interp, fovs):
+    return Analyzer(interp, images=fovs, input_col="input", target_col="target",
+                    patch_size=PATCH, xy_step=8, z_step=4, batch_size=2, device=DEVICE)
+
+
+def test_analyze_in_memory_matches_csv(tmp_path):
+    # In-memory FOVs (array and dict form) must reproduce the CSV/tiff path exactly.
+    csv = _write_fov(tmp_path)
+    arr = np.asarray(tifffile.imread(pd.read_csv(csv)["path_tiff"].iloc[0])).astype(np.float32)
+    fov_array = arr                                   # (C, Z, Y, X), canonical channel order
+    fov_dict = {
+        "input": arr[0], "target": arr[1], "structure_seg": arr[2],
+        "channel_dna": arr[3], "channel_membrane": arr[4], "membrane_seg": arr[5],
+    }
+
+    ref = _analyzer(csv).analyze_th(str(tmp_path / "csv"), mode="agg", images=[0], seed=0)[0]
+
+    torch.manual_seed(0)
+    interp = Image2ImageInterpreter(RegionImagePredictor((4, 8, 8)), spatial_size=(4, 8, 8),
+                                    ndim=3, in_channels=1, pred_channels=1,
+                                    loss=LossConfig(pcc_target=0.9))
+    got_arr = _in_memory_analyzer(interp, [fov_array]).analyze_th(
+        str(tmp_path / "arr"), mode="agg", images=[0], seed=0)[0]
+    got_dict = _in_memory_analyzer(interp, [fov_dict]).analyze_th(
+        str(tmp_path / "dct"), mode="agg", images=[0], seed=0)[0]
+
+    pd.testing.assert_frame_equal(ref, got_arr)
+    pd.testing.assert_frame_equal(ref, got_dict)
+
+
+def test_in_memory_missing_optional_channel(tmp_path):
+    # Only input/target present; seg absent -> structure_seg None -> zeros (like the tiff path).
+    rng = np.random.default_rng(0)
+    fov = {"input": rng.standard_normal((Z, Y, X)).astype(np.float32),
+           "target": rng.standard_normal((Z, Y, X)).astype(np.float32)}
+    torch.manual_seed(0)
+    interp = Image2ImageInterpreter(RegionImagePredictor((4, 8, 8)), spatial_size=(4, 8, 8),
+                                    ndim=3, in_channels=1, pred_channels=1,
+                                    loss=LossConfig(pcc_target=0.9))
+    az = _in_memory_analyzer(interp, [fov])
+    r = az.calc_unet_pcc(str(tmp_path / "o"), images=[0])
+    assert math.isfinite(float(r["PCC"].iloc[0]))
+
+
+def test_analyzer_requires_exactly_one_source():
+    with pytest.raises(ValueError, match="exactly one"):
+        Analyzer(None)  # neither data nor images
+    with pytest.raises(ValueError, match="exactly one"):
+        Analyzer(None, data="x.csv", images=[{}])  # both
+
+
 def test_default_images_clamped_to_dataset_size(tmp_path):
     # Default images=range(10) must not run df.iloc past the end of a small (1-FOV) set.
     csv = _write_fov(tmp_path)

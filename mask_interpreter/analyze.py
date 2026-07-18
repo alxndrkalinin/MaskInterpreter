@@ -79,6 +79,52 @@ def preprocess_image(
     return images
 
 
+def _as_zyx1(a) -> np.ndarray:
+    """Coerce a channel array/tensor to float32 ``(Z, Y, X, 1)``."""
+    if torch.is_tensor(a):
+        a = a.detach().cpu().numpy()
+    a = np.asarray(a).astype(np.float32)
+    if a.ndim == 4 and a.shape[-1] == 1:
+        a = a[..., 0]
+    if a.ndim != 3:
+        raise ValueError(f"FOV channel must be (Z, Y, X) or (Z, Y, X, 1); got shape {a.shape}")
+    return a[..., None]
+
+
+def preprocess_fov(fov, columns, normalize, min_z: int = 32, slice_by=None):
+    """In-memory analogue of ``preprocess_image`` → list of ``(Z, Y, X, 1)`` arrays (or None).
+
+    Applies the *same* per-channel std-normalize / crop / Z-pad as the tiff path, but reads
+    channels from a FOV already in memory. ``fov`` is either:
+
+    - a ``dict`` mapping role names (the ``columns`` — e.g. ``"input"``, ``"target"``,
+      ``"structure_seg"``) to ``(Z, Y, X)`` / ``(Z, Y, X, 1)`` numpy arrays or torch tensors;
+      absent roles yield ``None``; or
+    - a channel-first ``(C, Z, Y, X)`` array/tensor whose channels are taken in ``columns``
+      order (``[input, target, structure_seg, channel_dna, channel_membrane, membrane_seg]``);
+      channels beyond ``C`` yield ``None``.
+    """
+    if torch.is_tensor(fov):
+        fov = fov.detach().cpu().numpy()
+    is_dict = isinstance(fov, dict)
+    arr = None if is_dict else np.asarray(fov)
+    images: list[np.ndarray | None] = []
+    for i, col in enumerate(columns):
+        ch = fov.get(col) if is_dict else (arr[i] if i < arr.shape[0] else None)
+        if ch is None:
+            images.append(None)
+            continue
+        image = _as_zyx1(ch)
+        if normalize is True or normalize[i]:
+            image = normalize_std(image)
+        if slice_by is not None:
+            image = slice_image(image, slice_by)
+        if image.shape[0] < min_z:
+            image = pad_z_to(image, min_z, axis=0)
+        images.append(image)
+    return images
+
+
 def _context_ratio(mask_binary: np.ndarray, seg: np.ndarray) -> tuple[float, float]:
     """Return ``(mask_size_fraction, context_ratio)``.
 
@@ -103,9 +149,9 @@ class Analyzer:
     def __init__(
         self,
         interpreter: torch.nn.Module,
-        data,
-        input_col: str,
-        target_col: str,
+        data=None,
+        input_col: str = "input",
+        target_col: str = "target",
         patch_size: tuple[int, ...] = (32, 128, 128, 1),
         xy_step: int = 64,
         z_step: int = 16,
@@ -117,12 +163,24 @@ class Analyzer:
         nuc_col: str = "channel_dna",
         mem_col: str = "channel_membrane",
         mem_seg_col: str = "membrane_seg",
+        images=None,
     ) -> None:
+        """Analyze FOVs from a CSV/tiff list (``data``) **or** from in-memory FOVs (``images``).
+
+        Provide exactly one source. ``data`` is a CSV path / DataFrame mapping ``*_col`` names
+        to channel indices inside per-row ``path_col`` tiffs (the original path). ``images`` is a
+        sequence of in-memory FOVs — each a role→array ``dict`` or a channel-first
+        ``(C, Z, Y, X)`` array/tensor (see ``preprocess_fov``); the per-method ``images=range(N)``
+        argument then selects indices into this sequence.
+        """
+        if (data is None) == (images is None):
+            raise ValueError("provide exactly one of `data` (CSV/DataFrame) or `images` (in-memory FOVs)")
         if not torch.cuda.is_available() and str(device).startswith("cuda"):
             device = "cpu"
         self.device = torch.device(device)
         self.interpreter = interpreter.to(self.device).eval()
         self.df = pd.read_csv(data) if isinstance(data, str) else data
+        self._images = list(images) if images is not None else None
         self.input_col = input_col
         self.target_col = target_col
         self.patch_size = tuple(int(p) for p in patch_size)
@@ -142,10 +200,15 @@ class Analyzer:
         in-bounds indices for all analyses so the default never runs ``df.iloc`` past the
         end (which raised ``IndexError``).
         """
-        n = len(self.df)
+        n = len(self._images) if self._images is not None else len(self.df)
         return [int(i) for i in images if 0 <= int(i) < n]
 
     def _preprocess(self, image_index: int, slice_by):
+        if self._images is not None:
+            return preprocess_fov(
+                self._images[image_index], self.columns, list(FOV_NORMALIZE),
+                min_z=self.patch_size[0], slice_by=slice_by,
+            )
         return preprocess_image(
             self.df, image_index, self.columns, list(FOV_NORMALIZE),
             path_col=self.path_col, min_z=self.patch_size[0], slice_by=slice_by,
